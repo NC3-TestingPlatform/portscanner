@@ -14,7 +14,7 @@ $ portscanner check scanme.nmap.org
 ```
 
 ![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)
-![Tests](https://img.shields.io/badge/tests-96%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-98%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPLv3-lightgrey)
 
@@ -40,7 +40,7 @@ Part of the [NC3-TestingPlatform](https://github.com/NC3-TestingPlatform).
 | Capability | What it does |
 | --- | --- |
 | **Multiple targets** | Scan any number of targets in one run — on the command line and/or from a file (`--target-file` / `-iL`). |
-| **Fast mode (`--masscan`)** | Two-phase scan: masscan sweeps the port range fast, then nmap runs service detection **only** on the ports masscan found open. Needs root/`CAP_NET_RAW`. |
+| **Fast mode (`--rustscan`)** | Two-phase scan: rustscan sweeps all ports fast, then nmap runs service detection **only** on the ports rustscan found open. TCP connect scan — no root needed. |
 | **Port scan** | TCP connect scan (`nmap -sT`) — no root required. |
 | **Service/version detection** | On by default (`nmap -sV`); disable with `--no-service`. |
 | **Scope control** | `--ports 22,80,443`, `--ports 1-1024`, or `--top-ports N`. |
@@ -63,7 +63,7 @@ output, so parsing is hardened against XXE / entity-expansion).
 
 - Python ≥ 3.11
 - [`nmap`](https://nmap.org) on `PATH` (required)
-- [`masscan`](https://github.com/robertdavidgraham/masscan) on `PATH` — optional, only for `--masscan` (needs root/`CAP_NET_RAW`)
+- [`rustscan`](https://github.com/RustScan/RustScan) on `PATH` — optional, only for `--rustscan` (no root needed)
 - Python deps (installed automatically): `nmap2json`, `defusedxml`, `rich`, `typer`
 
 ---
@@ -96,7 +96,7 @@ portscanner info
 | Tool | Kind | Install |
 | --- | --- | --- |
 | `nmap` | PATH binary (required) | `apt install nmap` / `dnf install nmap` / `brew install nmap` |
-| `masscan` | PATH binary (optional, for `--masscan`) | `apt install masscan` — needs root/`CAP_NET_RAW` to run |
+| `rustscan` | PATH binary (optional, for `--rustscan`) | `cargo install rustscan` (or GitHub releases) — no root needed |
 | `nmap2json` | Python dependency | installed via pip (not a PATH binary) |
 
 ---
@@ -117,9 +117,9 @@ portscanner check extra.example --target-file targets.txt   # file + CLI targets
 # A CIDR range, skipping host discovery, only the 100 most common ports
 portscanner check 10.0.0.0/24 --top-ports 100 --skip-ping
 
-# Fast mode: masscan discovers open ports, nmap fingerprints only those (needs root)
-sudo portscanner check 10.0.0.0/24 --masscan
-sudo portscanner check scanme.nmap.org --masscan --masscan-ports 1-1000 --masscan-rate 5000
+# Fast mode: rustscan discovers open ports, nmap fingerprints only those (no root)
+portscanner check 10.0.0.0/24 --rustscan
+portscanner check scanme.nmap.org --rustscan --rustscan-ports 1-1000 --rustscan-batch 5000
 
 # Explicit ports, gentler timing, JSON to stdout
 portscanner check example.com -p 22,80,443 --timing 3 --json
@@ -147,9 +147,11 @@ portscanner --version    # or -V
 | `--max-retries N` | Cap probe retransmissions. |
 | `--skip-ping` | Skip host discovery, treat every host as up (`-Pn`). |
 | `--no-service` | Disable service/version detection (`-sV` is on by default). |
-| `--masscan` | Fast two-phase scan: masscan discovers open ports, then nmap fingerprints only those. Needs root; not combinable with `--ports`/`--top-ports`. |
-| `--masscan-rate N` | masscan transmit rate in packets/sec (default 1000). |
-| `--masscan-ports SPEC` | Port range masscan sweeps for discovery (default `1-65535`). |
+| `--rustscan` | Fast two-phase scan: rustscan discovers open ports, then nmap fingerprints only those. No root; not combinable with `--ports`/`--top-ports`. |
+| `--rustscan-batch N` | rustscan parallel batch size (`--batch-size`). |
+| `--rustscan-timeout MS` | rustscan per-port timeout in milliseconds (`--timeout`). |
+| `--rustscan-ports SPEC` | Discovery port spec rustscan sweeps (default: its full range). |
+| `--rustscan-ulimit N` | File-descriptor limit rustscan requests (`--ulimit`); raising it speeds up full-range scans. |
 | `--timeout S` | Overall subprocess timeout for the nmap run. |
 | `--json` | Print machine-readable JSON instead of Rich tables. |
 | `-o`, `--output` | Save report; format inferred from extension (`.txt` / `.svg` / `.html`). |
@@ -196,9 +198,11 @@ assess(
     max_retries=None,      # "--max-retries"
     skip_ping=False,       # "-Pn"
     service_detection=True,# "-sV"
-    masscan=False,         # two-phase masscan→nmap discovery
-    masscan_rate=None,     # masscan --rate (default 1000)
-    masscan_ports=None,    # masscan discovery range (default 1-65535)
+    rustscan=False,        # two-phase rustscan→nmap discovery
+    rustscan_batch=None,   # rustscan --batch-size
+    rustscan_timeout=None, # rustscan per-port --timeout (ms)
+    rustscan_ports=None,   # rustscan discovery range (default: full range)
+    rustscan_ulimit=None,  # rustscan --ulimit
     timeout=300.0,         # per-process subprocess timeout (float)
     progress_cb=None,      # Callable[[str], None]
 ) -> ScanReport
@@ -217,7 +221,7 @@ portscanner/
   cli.py          → Typer entry point; validation, flags, progress, output
   assessor.py     → Public API: assess(...) → ScanReport; dict→model conversion
   nmap_utils.py   → nmap I/O boundary: build_nmap_args(), run_scan(), parse_nmap_xml()
-  masscan_utils.py→ masscan I/O boundary: resolve_targets(), run_scan_masscan(), parse_masscan_list()
+  rustscan_utils.py→ rustscan I/O boundary: build_rustscan_args(), run_scan_rustscan(), parse_rustscan_greppable()
   models.py       → HostState/PortState enums; ServiceInfo/PortResult/HostResult/ScanReport
   constants.py    → REQUIRED_TOOLS registry; detect_tools(); get_install_hint()
   reporter.py     → Rich renderers; to_dict(); save_report()
@@ -237,6 +241,6 @@ pytest --tb=short -q      # quick run
 ruff check portscanner/   # lint
 ```
 
-The test suite has **96 tests**. Network and subprocess I/O are mocked at the
-`nmap_utils` / `masscan_utils` / `subprocess.run` boundaries, so tests never
-launch nmap or masscan.
+The test suite has **98 tests**. Network and subprocess I/O are mocked at the
+`nmap_utils` / `rustscan_utils` / `subprocess.run` boundaries, so tests never
+launch nmap or rustscan.

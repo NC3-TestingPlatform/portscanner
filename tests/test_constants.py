@@ -21,10 +21,10 @@ def test_get_install_hint_known_tool():
 
 
 def test_get_install_hint_unknown_tool():
-    hint = constants.get_install_hint("rustscan")
-    assert "rustscan" in hint
+    hint = constants.get_install_hint("naabu")
+    assert "naabu" in hint
     assert "PATH" in hint
 
 
-def test_required_tools_contains_masscan():
-    assert "masscan" in constants.REQUIRED_TOOLS
+def test_required_tools_contains_rustscan():
+    assert "rustscan" in constants.REQUIRED_TOOLS

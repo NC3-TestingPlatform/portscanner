@@ -16,14 +16,8 @@ import logging
 import shlex
 from typing import Callable, Iterable
 
-from portscanner.constants import (
-    DEFAULT_MASSCAN_PORTS,
-    DEFAULT_MASSCAN_RATE,
-    DEFAULT_TIMEOUT,
-    DEFAULT_TIMING,
-    TARGET_RE,
-)
-from portscanner.masscan_utils import run_scan_masscan
+from portscanner.constants import DEFAULT_TIMEOUT, DEFAULT_TIMING, TARGET_RE
+from portscanner.rustscan_utils import run_scan_rustscan
 from portscanner.models import (
     HostResult,
     HostState,
@@ -171,19 +165,21 @@ def assess(
     max_retries: int | None = None,
     skip_ping: bool = False,
     service_detection: bool = True,
-    masscan: bool = False,
-    masscan_rate: int | None = None,
-    masscan_ports: str | None = None,
+    rustscan: bool = False,
+    rustscan_batch: int | None = None,
+    rustscan_timeout: int | None = None,
+    rustscan_ports: str | None = None,
+    rustscan_ulimit: int | None = None,
     timeout: float = DEFAULT_TIMEOUT,
     progress_cb: Callable[[str], None] | None = None,
 ) -> ScanReport:
     """Scan one or more *targets* with nmap and return a :class:`~portscanner.models.ScanReport`.
 
-    When *masscan* is enabled, a fast masscan sweep discovers open ports first
-    and nmap then runs service detection **only** on the union of ports masscan
-    reported open — much faster than nmap sweeping a wide range itself. masscan
-    needs root / ``CAP_NET_RAW``. If masscan finds no open ports, nmap is
-    skipped and a report with no hosts is returned.
+    When *rustscan* is enabled, a fast rustscan sweep discovers open ports first
+    and nmap then runs service detection **only** on the union of ports rustscan
+    reported open — much faster than nmap sweeping a wide range itself. rustscan
+    uses a TCP connect scan, so it needs no root. If rustscan finds no open
+    ports, nmap is skipped and a report with no hosts is returned.
 
     :param targets: A single target string or an iterable of targets — each a
         host, IP, or CIDR range (e.g. ``"scanme.nmap.org"``, ``"10.0.0.0/24"``).
@@ -191,28 +187,31 @@ def assess(
         per line; blank lines and ``#`` comments ignored). Targets from the file
         are merged with *targets* and de-duplicated.
     :param ports: Explicit ``-p`` port spec; mutually exclusive with *top_ports*
-        and with *masscan*.
+        and with *rustscan*.
     :param top_ports: Scan nmap's N most common ports (``--top-ports``);
-        mutually exclusive with *ports* and with *masscan*. When neither is
-        given (and *masscan* is off), nmap's default top-1000 ports are scanned.
+        mutually exclusive with *ports* and with *rustscan*. When neither is
+        given (and *rustscan* is off), nmap's default top-1000 ports are scanned.
     :param timing: nmap timing template 0–5 (``-T<n>``); defaults to 4.
     :param host_timeout: Per-host time budget in seconds (``--host-timeout``).
     :param max_retries: Cap on probe retransmissions (``--max-retries``).
     :param skip_ping: Skip host discovery and treat hosts as up (``-Pn``).
     :param service_detection: Enable service/version detection (``-sV``).
-    :param masscan: Run a masscan fast-discovery phase before nmap.
-    :param masscan_rate: masscan transmit rate in packets/sec (default 1000).
-    :param masscan_ports: Port range masscan sweeps for discovery (default the
-        full range ``1-65535``).
+    :param rustscan: Run a rustscan fast-discovery phase before nmap.
+    :param rustscan_batch: rustscan parallel batch size (``--batch-size``).
+    :param rustscan_timeout: rustscan per-port timeout in ms (``--timeout``).
+    :param rustscan_ports: Discovery port spec rustscan sweeps (default: its
+        full range).
+    :param rustscan_ulimit: File-descriptor limit rustscan requests
+        (``--ulimit``); raising it speeds up full-range scans.
     :param timeout: Per-process subprocess timeout in seconds (applied to the
-        masscan run and the nmap run independently).
+        rustscan run and the nmap run independently).
     :param progress_cb: Optional callback invoked with progress strings.
     :returns: Completed scan report (inventory only — no grade/severity).
     :rtype: ScanReport
     :raises ValueError: For missing/invalid targets or scan parameters (e.g.
-        combining ``--masscan`` with ``--ports``/``--top-ports``).
-    :raises RuntimeError: If a scanner is unavailable, masscan lacks privileges,
-        or nmap output cannot be parsed.
+        combining ``--rustscan`` with ``--ports``/``--top-ports``).
+    :raises RuntimeError: If a scanner is unavailable or nmap output cannot be
+        parsed.
     """
     target_list = _collect_targets(targets, target_file)
 
@@ -220,30 +219,30 @@ def assess(
         if progress_cb:
             progress_cb(msg)
 
-    if masscan:
+    if rustscan:
         if ports or top_ports is not None:
             raise ValueError(
-                "--ports/--top-ports cannot be combined with --masscan; "
-                "use --masscan-ports to set the discovery range."
+                "--ports/--top-ports cannot be combined with --rustscan; "
+                "use --rustscan-ports to set the discovery range."
             )
-        discovery_ports = masscan_ports or DEFAULT_MASSCAN_PORTS
-        rate = masscan_rate if masscan_rate is not None else DEFAULT_MASSCAN_RATE
-        open_ports, masscan_cmd = run_scan_masscan(
+        open_ports, rustscan_cmd = run_scan_rustscan(
             target_list,
-            ports=discovery_ports,
-            rate=rate,
+            ports=rustscan_ports,
+            batch=rustscan_batch,
+            port_timeout=rustscan_timeout,
+            ulimit=rustscan_ulimit,
             timeout=timeout,
             progress_cb=progress_cb,
         )
         if not open_ports:
-            _cb("masscan found no open ports.")
+            _cb("rustscan found no open ports.")
             return ScanReport(
                 targets=target_list,
-                command=masscan_cmd,
+                command=rustscan_cmd,
                 hosts=[],
                 timed_out=False,
             )
-        _cb(f"masscan found {len(open_ports)} open port(s); running nmap…")
+        _cb(f"rustscan found {len(open_ports)} open port(s); running nmap…")
         nmap_ports = ",".join(str(p) for p in open_ports)
         args = build_nmap_args(
             ports=nmap_ports,
@@ -253,7 +252,7 @@ def assess(
             skip_ping=skip_ping,
             service_detection=service_detection,
         )
-        command = f"{masscan_cmd} && {shlex.join(build_command(target_list, args))}"
+        command = f"{rustscan_cmd} && {shlex.join(build_command(target_list, args))}"
     else:
         args = build_nmap_args(
             ports=ports,

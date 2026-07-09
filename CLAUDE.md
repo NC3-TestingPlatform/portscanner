@@ -10,8 +10,8 @@
 | Safe XML parsing | defusedxml | ≥ 0.7 |
 | Testing | pytest + pytest-cov + pytest-mock | ≥ 8 / ≥ 5 / ≥ 3.12 |
 
-External binaries: **nmap** (required, on `PATH`); **masscan** (optional, only
-for `--masscan`; needs root / `CAP_NET_RAW`).
+External binaries: **nmap** (required, on `PATH`); **rustscan** (optional, only
+for `--rustscan`; TCP connect scan — no root needed).
 
 ## Build & Run
 ```bash
@@ -30,7 +30,7 @@ portscanner/
   cli.py          → Typer entry point; target validation, flags, progress, output
   assessor.py     → Public API: assess(...) → ScanReport; nmap2json dict → model conversion
   nmap_utils.py   → nmap I/O boundary: build_nmap_args(), build_command(), run_scan(), parse_nmap_xml(), read_targets_file()
-  masscan_utils.py→ masscan I/O boundary: build_masscan_args(), resolve_targets(), run_scan_masscan(), parse_masscan_list()
+  rustscan_utils.py→ rustscan I/O boundary: build_rustscan_args(), run_scan_rustscan(), parse_rustscan_greppable()
   models.py       → HostState/PortState enums; ServiceInfo/PortResult/HostResult/ScanReport dataclasses
   constants.py    → REQUIRED_TOOLS registry; detect_tools(); get_install_hint(); defaults
   reporter.py     → Rich renderers; to_dict(); save_report()
@@ -61,20 +61,21 @@ string with `defusedxml`, wraps the root in an `ElementTree`, and calls the
 library's core `nmap_to_json(tree)` directly. If a future release fixes the
 string entry point, this can be simplified — but keep the defusedxml parse.
 
-### masscan fast-discovery phase (`--masscan`)
-When enabled, `assess()` first calls `masscan_utils.run_scan_masscan()` to sweep
-the discovery range (`--masscan-ports`, default full range) and collect the union
-of open ports across all hosts. nmap then runs with `-p <those ports>` only. If
-masscan finds nothing, nmap is skipped and an empty-hosts report is returned. A
-non-zero masscan exit raises `RuntimeError` (never a silent empty result).
-`--masscan` is mutually exclusive with `--ports`/`--top-ports`. Hostnames are
-resolved to IPs for masscan (it can't scan names); nmap keeps the original targets.
+### rustscan fast-discovery phase (`--rustscan`)
+When enabled, `assess()` first calls `rustscan_utils.run_scan_rustscan()` in
+greppable mode (`-g`) to sweep the discovery range (`--rustscan-ports`, default
+rustscan's full range) and collect the union of open ports across all hosts.
+nmap then runs with `-p <those ports>` only. If rustscan finds nothing, nmap is
+skipped and an empty-hosts report is returned. `--rustscan` is mutually exclusive
+with `--ports`/`--top-ports`. rustscan uses a TCP connect scan (no root) and
+resolves hostnames itself, so targets pass through unchanged. A non-zero exit
+with an error message and no discovered ports raises `RuntimeError`.
 
 ### I/O boundaries (mock these in tests)
 | Boundary | Module | What to patch |
 |----------|--------|---------------|
 | nmap subprocess | `nmap_utils.py` | `nmap_utils.subprocess.run` (unit) or `assessor.run_scan` (integration) |
-| masscan subprocess | `masscan_utils.py` | `masscan_utils.subprocess.run` + `masscan_utils.resolve_targets` (unit) or `assessor.run_scan_masscan` (integration) |
+| rustscan subprocess | `rustscan_utils.py` | `rustscan_utils.subprocess.run` (unit) or `assessor.run_scan_rustscan` (integration) |
 
 Never mock `assess()` itself in library tests. `cli.py` tests may patch
 `portscanner.cli.assess` to exercise CLI wiring in isolation.
@@ -100,7 +101,7 @@ services identified). Do not add grading.
 - Use `mocker` (pytest-mock) or `unittest.mock.patch`.
 - AAA pattern: Arrange → Act → Assert.
 - Coverage target: ≥ 80% (configured in `pyproject.toml`). Current: **96%**.
-- Current test count: **96 tests**.
+- Current test count: **98 tests**.
 
 ## Adding a scan option
 1. Add the parameter to `nmap_utils.build_nmap_args()` (pure; emit flags in a

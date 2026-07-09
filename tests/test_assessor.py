@@ -96,53 +96,62 @@ def test_assess_ports_and_top_ports_raises_value_error():
         assess("host", ports="22", top_ports=10)
 
 
-def test_assess_masscan_then_nmap(mocker, sample_hosts):
+def test_assess_rustscan_then_nmap(mocker, sample_hosts):
     mocker.patch.object(
-        assessor, "run_scan_masscan", return_value=([22, 80], "masscan 1.2.3.4 -oL -")
+        assessor, "run_scan_rustscan", return_value=([22, 80], "rustscan -a scanme")
     )
     nmap_spy = mocker.patch.object(
         assessor, "run_scan", return_value=(sample_hosts, False)
     )
-    report = assessor.assess(["scanme.nmap.org"], masscan=True)
+    report = assessor.assess(["scanme.nmap.org"], rustscan=True)
 
-    # nmap must be restricted to exactly the ports masscan discovered
+    # nmap must be restricted to exactly the ports rustscan discovered
     _, kwargs = nmap_spy.call_args
     assert "-p" in kwargs["args"]
     assert kwargs["args"][kwargs["args"].index("-p") + 1] == "22,80"
-    assert "masscan" in report.command and "nmap" in report.command
+    assert "rustscan" in report.command and "nmap" in report.command
     assert len(report.hosts) == 1
 
 
-def test_assess_masscan_no_open_ports_skips_nmap(mocker):
+def test_assess_rustscan_no_open_ports_skips_nmap(mocker):
     mocker.patch.object(
-        assessor, "run_scan_masscan", return_value=([], "masscan 1.2.3.4 -oL -")
+        assessor, "run_scan_rustscan", return_value=([], "rustscan -a 1.2.3.4")
     )
     nmap_spy = mocker.patch.object(assessor, "run_scan")
-    report = assessor.assess(["1.2.3.4"], masscan=True)
+    report = assessor.assess(["1.2.3.4"], rustscan=True)
 
     nmap_spy.assert_not_called()
     assert report.hosts == []
-    assert report.command == "masscan 1.2.3.4 -oL -"
+    assert report.command == "rustscan -a 1.2.3.4"
 
 
-def test_assess_masscan_passes_rate_and_ports(mocker):
+def test_assess_rustscan_passes_tuning(mocker):
     spy = mocker.patch.object(
-        assessor, "run_scan_masscan", return_value=([], "masscan")
+        assessor, "run_scan_rustscan", return_value=([], "rustscan")
     )
-    assessor.assess(["1.2.3.4"], masscan=True, masscan_rate=5000, masscan_ports="80,443")
+    assessor.assess(
+        ["1.2.3.4"],
+        rustscan=True,
+        rustscan_batch=5000,
+        rustscan_timeout=1500,
+        rustscan_ports="1-1000",
+        rustscan_ulimit=5000,
+    )
     _, kwargs = spy.call_args
-    assert kwargs["rate"] == 5000
-    assert kwargs["ports"] == "80,443"
+    assert kwargs["batch"] == 5000
+    assert kwargs["port_timeout"] == 1500
+    assert kwargs["ports"] == "1-1000"
+    assert kwargs["ulimit"] == 5000
 
 
-def test_assess_masscan_with_ports_raises(mocker):
-    with pytest.raises(ValueError, match="masscan"):
-        assessor.assess(["1.2.3.4"], masscan=True, ports="22")
+def test_assess_rustscan_with_ports_raises(mocker):
+    with pytest.raises(ValueError, match="rustscan"):
+        assessor.assess(["1.2.3.4"], rustscan=True, ports="22")
 
 
-def test_assess_masscan_with_top_ports_raises(mocker):
-    with pytest.raises(ValueError, match="masscan"):
-        assessor.assess(["1.2.3.4"], masscan=True, top_ports=100)
+def test_assess_rustscan_with_top_ports_raises(mocker):
+    with pytest.raises(ValueError, match="rustscan"):
+        assessor.assess(["1.2.3.4"], rustscan=True, top_ports=100)
 
 
 def test_to_host_minimal_dict():

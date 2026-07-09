@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from typer.testing import CliRunner
 
 from portscanner import cli
@@ -55,29 +57,29 @@ def test_check_target_file(mocker, sample_report, tmp_path):
     assert kwargs["target_file"] == str(f)
 
 
-def test_check_masscan_flag(mocker, sample_report):
+def test_check_rustscan_flag(mocker, sample_report):
     spy = mocker.patch.object(cli, "assess", return_value=sample_report)
-    result = runner.invoke(app, ["check", "1.2.3.4", "--masscan"])
+    result = runner.invoke(app, ["check", "1.2.3.4", "--rustscan"])
     assert result.exit_code == 0
     _, kwargs = spy.call_args
-    assert kwargs["masscan"] is True
+    assert kwargs["rustscan"] is True
 
 
-def test_check_masscan_rate_and_ports(mocker, sample_report):
+def test_check_rustscan_tuning(mocker, sample_report):
     spy = mocker.patch.object(cli, "assess", return_value=sample_report)
     result = runner.invoke(
         app,
-        ["check", "1.2.3.4", "--masscan", "--masscan-rate", "5000", "--masscan-ports", "1-1000"],
+        ["check", "1.2.3.4", "--rustscan", "--rustscan-batch", "5000", "--rustscan-ports", "1-1000"],
     )
     assert result.exit_code == 0
     _, kwargs = spy.call_args
-    assert kwargs["masscan_rate"] == 5000
-    assert kwargs["masscan_ports"] == "1-1000"
+    assert kwargs["rustscan_batch"] == 5000
+    assert kwargs["rustscan_ports"] == "1-1000"
 
 
-def test_check_masscan_with_ports_exit_1():
+def test_check_rustscan_with_ports_exit_1():
     # assess() raises ValueError before any subprocess runs → exit 1
-    result = runner.invoke(app, ["check", "1.2.3.4", "--masscan", "-p", "22"])
+    result = runner.invoke(app, ["check", "1.2.3.4", "--rustscan", "-p", "22"])
     assert result.exit_code == 1
 
 
@@ -89,6 +91,22 @@ def test_check_no_targets_and_no_file_exit_1():
 def test_check_missing_target_file_exit_1():
     result = runner.invoke(app, ["check", "-iL", "/no/such/targets.txt"])
     assert result.exit_code == 1
+
+
+def test_check_json_valid_with_long_command(mocker, sample_report):
+    # A long (two-phase) command must not be word-wrapped into invalid JSON.
+    sample_report.command = (
+        "rustscan -a scanme.nmap.org --greppable --range 1-65535 --batch-size 5000 "
+        "&& nmap -sT -sV -p 22,80,443,8080,8443 -T4 -oX - scanme.nmap.org"
+    )
+    mocker.patch.object(cli, "assess", return_value=sample_report)
+    result = runner.invoke(app, ["check", "scanme.nmap.org", "--rustscan", "--json"])
+    assert result.exit_code == 0
+    # Isolate the JSON object (the CliRunner merges the stderr progress spinner
+    # into output); it must parse — i.e. no newline was wrapped into a string.
+    out = result.output
+    data = json.loads(out[out.index("{") : out.rindex("}") + 1])
+    assert data["command"] == sample_report.command
 
 
 def test_check_writes_output_file(mocker, sample_report, tmp_path):

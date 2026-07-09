@@ -129,20 +129,28 @@ def check(
         bool,
         typer.Option("--no-service", help="Disable service/version detection (-sV is on by default)."),
     ] = False,
-    masscan: Annotated[
+    rustscan: Annotated[
         bool,
         typer.Option(
-            "--masscan",
-            help="Fast two-phase scan: discover open ports with masscan (needs root/CAP_NET_RAW), then run nmap service detection only on those ports. Not combinable with --ports/--top-ports.",
+            "--rustscan",
+            help="Fast two-phase scan: discover open ports with rustscan (no root needed), then run nmap service detection only on those ports. Not combinable with --ports/--top-ports.",
         ),
     ] = False,
-    masscan_rate: Annotated[
+    rustscan_batch: Annotated[
         Optional[int],
-        typer.Option("--masscan-rate", help="masscan transmit rate in packets/sec (default 1000)."),
+        typer.Option("--rustscan-batch", help="rustscan parallel batch size (--batch-size)."),
     ] = None,
-    masscan_ports: Annotated[
+    rustscan_timeout: Annotated[
+        Optional[int],
+        typer.Option("--rustscan-timeout", help="rustscan per-port timeout in milliseconds (--timeout)."),
+    ] = None,
+    rustscan_ports: Annotated[
         Optional[str],
-        typer.Option("--masscan-ports", help="Port range masscan sweeps for discovery (default 1-65535)."),
+        typer.Option("--rustscan-ports", help="Discovery port spec rustscan sweeps (default: its full range)."),
+    ] = None,
+    rustscan_ulimit: Annotated[
+        Optional[int],
+        typer.Option("--rustscan-ulimit", help="File-descriptor limit rustscan requests (--ulimit); raising it speeds up full-range scans."),
     ] = None,
     output: Annotated[
         Optional[str],
@@ -198,9 +206,11 @@ def check(
                 max_retries=max_retries,
                 skip_ping=skip_ping,
                 service_detection=not no_service,
-                masscan=masscan,
-                masscan_rate=masscan_rate,
-                masscan_ports=masscan_ports,
+                rustscan=rustscan,
+                rustscan_batch=rustscan_batch,
+                rustscan_timeout=rustscan_timeout,
+                rustscan_ports=rustscan_ports,
+                rustscan_ulimit=rustscan_ulimit,
                 timeout=timeout,
                 progress_cb=_progress_cb,
             )
@@ -247,8 +257,8 @@ def info() -> None:
         )
     console.print(table)
     console.print(
-        "[dim]nmap is required; masscan is optional (only for --masscan, and needs "
-        "root/CAP_NET_RAW). nmap2json is a Python dependency (pip), not a PATH binary.[/dim]"
+        "[dim]nmap is required; rustscan is optional (only for --rustscan; no root "
+        "needed). nmap2json is a Python dependency (pip), not a PATH binary.[/dim]"
     )
 
 
@@ -262,7 +272,10 @@ def _print_json(report) -> None:
 
     :param report: :class:`~portscanner.models.ScanReport` to serialise.
     """
-    console.print(json.dumps(to_dict(report), indent=2))
+    # soft_wrap=True stops Rich from word-wrapping long values (e.g. the
+    # two-phase command line), which would inject raw newlines inside JSON
+    # string values and produce invalid JSON.
+    console.print(json.dumps(to_dict(report), indent=2), soft_wrap=True)
 
 
 if __name__ == "__main__":  # pragma: no cover

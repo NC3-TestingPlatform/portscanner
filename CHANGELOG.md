@@ -11,6 +11,32 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [0.4.0] — 2026-07-09
+
+### Changed
+- Replaced the masscan fast-discovery phase with **rustscan**. rustscan sweeps
+  all ports quickly with a TCP connect scan (**no root required**, unlike
+  masscan) and resolves hostnames itself, then nmap runs service detection only
+  on the ports rustscan reported open.
+
+### Added
+- `--rustscan` flag plus `--rustscan-batch`, `--rustscan-timeout` (per-port ms),
+  `--rustscan-ports` (discovery range), and `--rustscan-ulimit`.
+- `assess()` gains keyword-only `rustscan`, `rustscan_batch`, `rustscan_timeout`,
+  `rustscan_ports`, and `rustscan_ulimit` parameters.
+- New `portscanner/rustscan_utils.py` I/O boundary (greppable `-g` run + parse).
+
+### Removed
+- `--masscan`, `--masscan-rate`, `--masscan-ports` CLI flags and the
+  `masscan`/`masscan_rate`/`masscan_ports` `assess()` parameters.
+- `portscanner/masscan_utils.py`; `masscan` removed from the tool registry
+  (`rustscan` added).
+
+### Fixed
+- `--json` output is no longer word-wrapped: a long (two-phase) command line
+  could be wrapped mid-string, injecting a newline into a JSON string value and
+  producing invalid JSON. JSON is now emitted with wrapping disabled.
+
 ## [0.3.0] — 2026-07-09
 
 ### Added
@@ -73,7 +99,8 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Test suite (60 tests) with I/O mocked at the `run_scan` / `subprocess.run`
   boundary.
 
-[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/NC3-TestingPlatform/portscanner/releases/tag/v0.1.0

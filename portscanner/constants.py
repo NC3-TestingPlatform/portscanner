@@ -18,18 +18,18 @@ import shutil
 # (embedded whitespace, shell metacharacters) rather than shell injection.
 TARGET_RE = re.compile(r"^[A-Za-z0-9._:\-/]+$")
 
-# External binaries the module can shell out to. ``nmap`` is required; ``masscan``
-# is optional and only used by the ``--masscan`` fast-discovery mode (it needs
-# root / CAP_NET_RAW to run). nmap2json is NOT listed here: it is a Python
+# External binaries the module can shell out to. ``nmap`` is required; ``rustscan``
+# is optional and only used by the ``--rustscan`` fast-discovery mode (a TCP
+# connect scan — no root needed). nmap2json is NOT listed here: it is a Python
 # dependency (see pyproject.toml), imported directly, not run as a subprocess.
 REQUIRED_TOOLS: dict[str, dict[str, str]] = {
     "nmap": {
         "binary": "nmap",
         "install": "apt install nmap  # or: dnf install nmap / brew install nmap",
     },
-    "masscan": {
-        "binary": "masscan",
-        "install": "apt install masscan  # optional, for --masscan; needs root/CAP_NET_RAW to run",
+    "rustscan": {
+        "binary": "rustscan",
+        "install": "cargo install rustscan  # optional, for --rustscan; or github.com/RustScan/RustScan/releases (no root needed)",
     },
 }
 
@@ -41,14 +41,8 @@ DEFAULT_TIMING = 4
 MIN_TIMING = 0
 MAX_TIMING = 5
 
-# Overall subprocess timeout for a single nmap invocation, in seconds.
+# Overall subprocess timeout for a single scanner invocation, in seconds.
 DEFAULT_TIMEOUT = 300.0
-
-# Defaults for the optional masscan fast-discovery phase (--masscan). masscan
-# sweeps the full TCP range at DEFAULT_MASSCAN_RATE packets/sec; nmap then runs
-# service detection only on the ports masscan reports open.
-DEFAULT_MASSCAN_RATE = 1000
-DEFAULT_MASSCAN_PORTS = "1-65535"
 
 
 def detect_tools() -> dict[str, bool]:
