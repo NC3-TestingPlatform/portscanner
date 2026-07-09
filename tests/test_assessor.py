@@ -127,7 +127,9 @@ def test_assess_ports_and_top_ports_raises_value_error():
 
 def test_assess_rustscan_then_nmap(mocker, sample_hosts):
     mocker.patch.object(
-        assessor, "run_scan_rustscan", return_value=([22, 80], "rustscan -a scanme")
+        assessor,
+        "run_scan_rustscan",
+        return_value=({"45.33.32.156": [22, 80]}, "rustscan -a scanme"),
     )
     nmap_spy = mocker.patch.object(
         assessor, "run_scan", return_value=(sample_hosts, False)
@@ -147,7 +149,7 @@ def test_assess_rustscan_then_nmap(mocker, sample_hosts):
 
 def test_assess_rustscan_no_open_ports_skips_nmap(mocker):
     mocker.patch.object(
-        assessor, "run_scan_rustscan", return_value=([], "rustscan -a 1.2.3.4")
+        assessor, "run_scan_rustscan", return_value=({}, "rustscan -a 1.2.3.4")
     )
     nmap_spy = mocker.patch.object(assessor, "run_scan")
     report = assessor.assess(["1.2.3.4"], rustscan=True)
@@ -159,7 +161,7 @@ def test_assess_rustscan_no_open_ports_skips_nmap(mocker):
 
 def test_assess_rustscan_passes_tuning(mocker):
     spy = mocker.patch.object(
-        assessor, "run_scan_rustscan", return_value=([], "rustscan")
+        assessor, "run_scan_rustscan", return_value=({}, "rustscan")
     )
     assessor.assess(
         ["1.2.3.4"],
@@ -174,6 +176,39 @@ def test_assess_rustscan_passes_tuning(mocker):
     assert kwargs["port_timeout"] == 1500
     assert kwargs["ports"] == "1-1000"
     assert kwargs["ulimit"] == 5000
+
+
+def test_assess_ipv6_target_adds_dash6(mocker):
+    spy = mocker.patch.object(assessor, "run_scan", return_value=([], False))
+    assess(["2001:db8::1"])
+    passed_targets, kwargs = spy.call_args
+    assert passed_targets[0] == ["2001:db8::1"]
+    assert "-6" in kwargs["args"]
+
+
+def test_assess_mixed_family_splits_into_two_nmap_runs(mocker):
+    spy = mocker.patch.object(assessor, "run_scan", return_value=([], False))
+    assess(["10.0.0.1", "2001:db8::1"])
+    assert spy.call_count == 2
+    by_family = {("-6" in kw["args"]): args[0] for args, kw in spy.call_args_list}
+    assert by_family[False] == ["10.0.0.1"]   # IPv4 group, no -6
+    assert by_family[True] == ["2001:db8::1"]  # IPv6 group, -6
+
+
+def test_assess_rustscan_per_host_targeting(mocker):
+    # Two hosts with different open ports → one nmap run per port-set, each
+    # scanning only its host for only its ports.
+    mocker.patch.object(
+        assessor,
+        "run_scan_rustscan",
+        return_value=({"10.0.0.1": [22], "10.0.0.2": [443]}, "rustscan"),
+    )
+    spy = mocker.patch.object(assessor, "run_scan", return_value=([], False))
+    assess(["10.0.0.1", "10.0.0.2"], rustscan=True)
+    assert spy.call_count == 2
+    runs = {tuple(args[0]): kw["args"] for args, kw in spy.call_args_list}
+    assert runs[("10.0.0.1",)][runs[("10.0.0.1",)].index("-p") + 1] == "22"
+    assert runs[("10.0.0.2",)][runs[("10.0.0.2",)].index("-p") + 1] == "443"
 
 
 def test_assess_rustscan_with_ports_raises(mocker):

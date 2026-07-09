@@ -63,10 +63,11 @@ string entry point, this can be simplified — but keep the defusedxml parse.
 
 ### rustscan fast-discovery phase (`--rustscan`)
 When enabled, `assess()` first calls `rustscan_utils.run_scan_rustscan()` in
-greppable mode (`-g`) to sweep the discovery range (`--rustscan-ports`, default
-rustscan's full range) and collect the union of open ports across all hosts.
-nmap then runs with `-p <those ports>` only. If rustscan finds nothing, nmap is
-skipped and an empty-hosts report is returned. `--rustscan` is mutually exclusive
+greppable mode (`-g`), which returns a host→open-ports map. `_rustscan_invocations()`
+groups hosts by (address family, exact port-set) and runs one nmap invocation per
+group with `-p <that host's ports>` and `-Pn` — each host is scanned only for its
+own ports. If rustscan finds nothing, nmap is skipped and an empty-hosts report is
+returned. `--rustscan` is mutually exclusive
 with `--ports`/`--top-ports`. rustscan uses a TCP connect scan (no root) and
 resolves hostnames itself, so targets pass through unchanged. A non-zero exit
 with an error message and no discovered ports raises `RuntimeError`.
@@ -87,8 +88,10 @@ Never mock `assess()` itself in library tests. `cli.py` tests may patch
   (`-Pn`) map straight through to nmap.
 - `--ports` and `--top-ports` are mutually exclusive; neither → nmap's top-1000.
 - Multiple targets (CLI args and/or `--target-file` / `-iL`) are merged,
-  validated against `constants.TARGET_RE`, de-duplicated by `_collect_targets()`
-  in `assessor.py`, and handed to a **single** nmap invocation.
+  validated against `constants.TARGET_RE` (leading `-` rejected), and
+  de-duplicated by `_collect_targets()`. IPv4 and IPv6 targets (and, in rustscan
+  mode, distinct per-host port-sets) run as **separate** nmap invocations —
+  IPv6 groups get `-6` — whose results are merged into one report.
 
 ## Scoring
 **Inventory only — no letter grade, no severity.** Per the platform convention,
@@ -101,7 +104,7 @@ services identified). Do not add grading.
 - Use `mocker` (pytest-mock) or `unittest.mock.patch`.
 - AAA pattern: Arrange → Act → Assert.
 - Coverage target: ≥ 80% (configured in `pyproject.toml`). Current: **96%**.
-- Current test count: **112 tests**.
+- Current test count: **115 tests**.
 
 ## Adding a scan option
 1. Add the parameter to `nmap_utils.build_nmap_args()` (pure; emit flags in a

@@ -23,7 +23,7 @@ from typing import Callable
 
 logger = logging.getLogger("portscanner")
 
-_GREPPABLE_RE = re.compile(r"->\s*\[([0-9,\s]*)\]")
+_GREPPABLE_RE = re.compile(r"^\s*(\S.*?)\s*->\s*\[([0-9,\s]*)\]", re.MULTILINE)
 
 
 def build_rustscan_args(
@@ -63,23 +63,24 @@ def build_rustscan_args(
     return args
 
 
-def parse_rustscan_greppable(text: str) -> list[int]:
-    """Parse rustscan greppable output into a sorted list of open ports.
+def parse_rustscan_greppable(text: str) -> dict[str, list[int]]:
+    """Parse rustscan greppable output into a per-host open-port map.
 
-    Each finding looks like ``45.33.32.156 -> [22,80]``. Ports are unioned
-    across all hosts; non-numeric or empty entries are ignored.
+    Each finding looks like ``45.33.32.156 -> [22,80]`` (IPv6 hosts may be
+    bracketed). Ports are collected per host so the nmap phase can scan each
+    host for only its own ports; non-numeric or empty entries are ignored.
 
     :param text: rustscan stdout in greppable (``-g``) mode.
-    :returns: Sorted, de-duplicated open port numbers.
-    :rtype: list[int]
+    :returns: Mapping of host → sorted, de-duplicated open port numbers.
+    :rtype: dict[str, list[int]]
     """
-    ports: set[int] = set()
+    hosts: dict[str, set[int]] = {}
     for match in _GREPPABLE_RE.finditer(text or ""):
-        for token in match.group(1).split(","):
-            token = token.strip()
-            if token.isdigit():
-                ports.add(int(token))
-    return sorted(ports)
+        host = match.group(1).strip().strip("[]")
+        ports = {int(t) for t in match.group(2).split(",") if t.strip().isdigit()}
+        if ports:
+            hosts.setdefault(host, set()).update(ports)
+    return {host: sorted(ports) for host, ports in hosts.items()}
 
 
 def run_scan_rustscan(
@@ -91,7 +92,7 @@ def run_scan_rustscan(
     ulimit: int | None = None,
     timeout: float,
     progress_cb: Callable[[str], None] | None = None,
-) -> tuple[list[int], str]:
+) -> tuple[dict[str, list[int]], str]:
     """Discover open ports on *targets* with rustscan (greppable mode).
 
     :param targets: Targets (hostnames, IPs, or CIDR ranges); rustscan resolves
@@ -103,8 +104,8 @@ def run_scan_rustscan(
     :param timeout: Maximum seconds to wait for the rustscan process. On
         timeout, rustscan is killed and its partial output is parsed.
     :param progress_cb: Optional callback for a progress message before launch.
-    :returns: Tuple of (sorted open ports, the rustscan command string).
-    :rtype: tuple[list[int], str]
+    :returns: Tuple of (host → sorted open ports map, the rustscan command string).
+    :rtype: tuple[dict[str, list[int]], str]
     :raises RuntimeError: If rustscan is not installed, or exits non-zero with
         an error message and no discovered ports.
     """

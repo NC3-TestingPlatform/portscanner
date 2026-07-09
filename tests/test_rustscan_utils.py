@@ -47,17 +47,20 @@ def test_build_args_tuning():
 
 
 def test_parse_greppable_sample():
-    assert parse_rustscan_greppable(SAMPLE_GREP) == [22, 80]
+    assert parse_rustscan_greppable(SAMPLE_GREP) == {"45.33.32.156": [22, 80]}
 
 
-def test_parse_greppable_unions_hosts_and_sorts():
+def test_parse_greppable_per_host():
     text = "1.1.1.1 -> [443,22]\n2.2.2.2 -> [80,443]\n"
-    assert parse_rustscan_greppable(text) == [22, 80, 443]
+    assert parse_rustscan_greppable(text) == {
+        "1.1.1.1": [22, 443],
+        "2.2.2.2": [80, 443],
+    }
 
 
 def test_parse_greppable_empty_and_no_open():
-    assert parse_rustscan_greppable("") == []
-    assert parse_rustscan_greppable("1.1.1.1 -> []\n") == []
+    assert parse_rustscan_greppable("") == {}
+    assert parse_rustscan_greppable("1.1.1.1 -> []\n") == {}
 
 
 # --- run_scan_rustscan ------------------------------------------------------
@@ -70,7 +73,7 @@ def test_run_rustscan_success(mocker):
         return_value=SimpleNamespace(returncode=0, stdout=SAMPLE_GREP, stderr=""),
     )
     ports, command = run_scan_rustscan(["scanme.nmap.org"], timeout=10)
-    assert ports == [22, 80]
+    assert ports == {"45.33.32.156": [22, 80]}
     assert command.startswith("rustscan -a scanme.nmap.org")
     assert "--greppable" in command
 
@@ -83,7 +86,7 @@ def test_run_rustscan_nonzero_but_ports_found(mocker):
         return_value=SimpleNamespace(returncode=1, stdout=SAMPLE_GREP, stderr=""),
     )
     ports, _ = run_scan_rustscan(["1.2.3.4"], timeout=10)
-    assert ports == [22, 80]
+    assert ports == {"45.33.32.156": [22, 80]}
 
 
 def test_run_rustscan_no_ports_clean_exit(mocker):
@@ -93,7 +96,7 @@ def test_run_rustscan_no_ports_clean_exit(mocker):
         return_value=SimpleNamespace(returncode=0, stdout="no ports here", stderr=""),
     )
     ports, _ = run_scan_rustscan(["1.2.3.4"], timeout=10)
-    assert ports == []
+    assert ports == {}
 
 
 def test_run_rustscan_error_raises(mocker):
@@ -121,4 +124,4 @@ def test_run_rustscan_timeout_parses_partial(mocker):
         ),
     )
     ports, _ = run_scan_rustscan(["1.2.3.4"], timeout=1)
-    assert ports == [22, 80]
+    assert ports == {"45.33.32.156": [22, 80]}

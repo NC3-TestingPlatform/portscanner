@@ -12,6 +12,7 @@ Typical usage::
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import shlex
 from typing import Callable, Iterable
@@ -211,6 +212,85 @@ def _merge_hosts_by_address(hosts: list[HostResult]) -> list[HostResult]:
     return merged
 
 
+def _address_family(target: str) -> str:
+    """Return ``"6"`` for an IPv6 literal/CIDR target, else ``"4"``.
+
+    Hostnames (which nmap resolves, defaulting to IPv4) map to ``"4"``.
+
+    :param target: A host, IP, or CIDR string.
+    :returns: ``"4"`` or ``"6"``.
+    :rtype: str
+    """
+    try:
+        return "6" if ipaddress.ip_network(target, strict=False).version == 6 else "4"
+    except ValueError:
+        return "4"
+
+
+def _family_invocations(
+    targets: list[str], base_args: list[str]
+) -> list[tuple[list[str], list[str]]]:
+    """Split *targets* by address family into one nmap invocation per family.
+
+    IPv4 and IPv6 cannot share a single nmap run; the IPv6 group gets ``-6``.
+
+    :param targets: Validated targets.
+    :param base_args: nmap flags shared by every group (from ``build_nmap_args``).
+    :returns: List of ``(targets, args)`` invocations, IPv4 first.
+    :rtype: list[tuple[list[str], list[str]]]
+    """
+    groups: dict[str, list[str]] = {}
+    for target in targets:
+        groups.setdefault(_address_family(target), []).append(target)
+    invocations: list[tuple[list[str], list[str]]] = []
+    for family in ("4", "6"):
+        group = groups.get(family)
+        if group:
+            invocations.append((group, base_args + (["-6"] if family == "6" else [])))
+    return invocations
+
+
+def _rustscan_invocations(
+    open_map: dict[str, list[int]],
+    *,
+    timing: int,
+    host_timeout: float | None,
+    max_retries: int | None,
+    service_detection: bool,
+    scripts: bool,
+) -> list[tuple[list[str], list[str]]]:
+    """Build per-host-targeted nmap invocations from rustscan's discovery map.
+
+    Hosts are grouped by (address family, exact open-port set) so each nmap run
+    scans only the ports actually found open on those hosts — avoiding the old
+    global-union over-scan. ``-Pn`` is forced (rustscan already proved liveness).
+
+    :param open_map: Host → open ports, from :func:`run_scan_rustscan`.
+    :returns: List of ``(hosts, args)`` invocations.
+    :rtype: list[tuple[list[str], list[str]]]
+    """
+    buckets: dict[tuple[str, tuple[int, ...]], list[str]] = {}
+    for host, ports in open_map.items():
+        family = "6" if ":" in host else "4"
+        buckets.setdefault((family, tuple(ports)), []).append(host)
+
+    invocations: list[tuple[list[str], list[str]]] = []
+    for (family, portset), hosts in buckets.items():
+        args = build_nmap_args(
+            ports=",".join(str(p) for p in portset),
+            timing=timing,
+            host_timeout=host_timeout,
+            max_retries=max_retries,
+            skip_ping=True,
+            service_detection=service_detection,
+            scripts=scripts,
+        )
+        if family == "6":
+            args = args + ["-6"]
+        invocations.append((hosts, args))
+    return invocations
+
+
 def assess(
     targets: str | Iterable[str],
     *,
@@ -280,13 +360,14 @@ def assess(
         if progress_cb:
             progress_cb(msg)
 
+    prefix = ""
     if rustscan:
         if ports or top_ports is not None:
             raise ValueError(
                 "--ports/--top-ports cannot be combined with --rustscan; "
                 "use --rustscan-ports to set the discovery range."
             )
-        open_ports, rustscan_cmd = run_scan_rustscan(
+        open_map, rustscan_cmd = run_scan_rustscan(
             target_list,
             ports=rustscan_ports,
             batch=rustscan_batch,
@@ -295,36 +376,26 @@ def assess(
             timeout=timeout,
             progress_cb=progress_cb,
         )
-        if not open_ports:
+        if not open_map:
             _cb("rustscan found no open ports.")
             return ScanReport(
-                targets=target_list,
-                command=rustscan_cmd,
-                hosts=[],
-                timed_out=False,
+                targets=target_list, command=rustscan_cmd, hosts=[], timed_out=False
             )
-        _cb(f"rustscan found {len(open_ports)} open port(s); running nmap…")
-        # Union of open ports across all hosts. When several distinct IPs are
-        # scanned, each is nmap-scanned for the whole union — nmap re-checks
-        # every port per host, so this cannot yield false "open" results, only
-        # some redundant probing of ports that were open on a different host.
-        nmap_ports = ",".join(str(p) for p in open_ports)
-        args = build_nmap_args(
-            ports=nmap_ports,
+        total_ports = sum(len(p) for p in open_map.values())
+        _cb(f"rustscan found {total_ports} open port(s); running nmap…")
+        # Each host is scanned only for the ports rustscan found open on it
+        # (grouped by family + port-set), not a global union.
+        invocations = _rustscan_invocations(
+            open_map,
             timing=timing,
             host_timeout=host_timeout,
             max_retries=max_retries,
-            # rustscan already proved these hosts are alive by completing a TCP
-            # connect to open ports, so force -Pn: without it nmap re-runs host
-            # discovery and marks ping-blocking (firewalled) hosts "down",
-            # skipping their service scan even though ports were just found open.
-            skip_ping=True,
             service_detection=service_detection,
             scripts=scripts,
         )
-        command = f"{rustscan_cmd} && {shlex.join(build_command(target_list, args))}"
+        prefix = f"{rustscan_cmd} && "
     else:
-        args = build_nmap_args(
+        base_args = build_nmap_args(
             ports=ports,
             top_ports=top_ports,
             timing=timing,
@@ -334,16 +405,26 @@ def assess(
             service_detection=service_detection,
             scripts=scripts,
         )
-        command = shlex.join(build_command(target_list, args))
+        invocations = _family_invocations(target_list, base_args)
         label = (
             target_list[0] if len(target_list) == 1 else f"{len(target_list)} targets"
         )
         _cb(f"Scanning {label}…")
 
-    raw_hosts, timed_out = run_scan(
-        target_list, args=args, timeout=timeout, progress_cb=progress_cb
-    )
+    # IPv4 and IPv6 (and, in rustscan mode, distinct port-sets) run as separate
+    # nmap invocations; their results are merged into one report.
+    raw_hosts: list[dict] = []
+    timed_out = False
+    commands: list[str] = []
+    for inv_targets, inv_args in invocations:
+        commands.append(shlex.join(build_command(inv_targets, inv_args)))
+        inv_hosts, inv_timed_out = run_scan(
+            inv_targets, args=inv_args, timeout=timeout, progress_cb=progress_cb
+        )
+        raw_hosts.extend(inv_hosts)
+        timed_out = timed_out or inv_timed_out
 
+    command = prefix + " ; ".join(commands)
     hosts = _merge_hosts_by_address([_to_host(h) for h in raw_hosts])
     hosts.sort(key=lambda h: h.address)
     _cb(f"Parsed {len(hosts)} host(s).")

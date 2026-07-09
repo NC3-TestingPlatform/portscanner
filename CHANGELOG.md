@@ -9,13 +9,26 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
-- Remaining Tier 2 items: per-host port targeting (scan each host only for its
-  own rustscan-discovered ports, instead of the global union), and IPv6 (`-6`) /
-  UDP (`-sU`) support.
-- Remaining Tier 3 items: stream nmap output for per-host progress + bounded
-  memory on very large scans; process-group termination of the scanner child.
+- UDP scanning (`-sU`).
+- Stream nmap output for per-host progress + bounded memory on very large scans;
+  process-group termination of the scanner child on cancellation.
 
 ---
+
+## [0.6.0] — 2026-07-09
+
+### Added
+- IPv6 targets are now scanned correctly: IPv6 literals/CIDRs are detected and
+  their nmap invocation gets `-6`. Mixed IPv4/IPv6 target lists run as separate
+  invocations (they cannot share one nmap run) and are merged into one report.
+
+### Changed
+- `--rustscan` now targets each host with only the ports rustscan found open on
+  *that* host (hosts grouped by address family + port-set), instead of scanning
+  every host for the global union of all discovered ports. `run_scan_rustscan`
+  / `parse_rustscan_greppable` now return a host→ports map.
+- Docker image builds on `python:slim` and installs rustscan from cargo
+  (`cargo install rustscan`).
 
 ## [0.5.2] — 2026-07-09
 
@@ -179,7 +192,8 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Test suite (60 tests) with I/O mocked at the `run_scan` / `subprocess.run`
   boundary.
 
-[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.3...v0.5.0
