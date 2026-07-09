@@ -1,0 +1,20 @@
+services:
+  portscanner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        RUSTSCAN_VERSION: "2.4.1"
+    image: portscanner:latest
+
+    # By default show help. Override with a real scan, e.g.:
+    #   docker compose run --rm portscanner check scanme.nmap.org --rustscan --json
+    entrypoint: ["portscanner"]
+    command: ["--help"]
+
+    volumes:
+      # Persist saved reports (--output) on the host
+      - ./reports:/reports
+
+    # Direct network access for scanning connectivity
+    network_mode: host
