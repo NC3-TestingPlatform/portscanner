@@ -132,6 +132,10 @@ def check(
         bool,
         typer.Option("--no-service", help="Disable service/version detection (-sV is on by default)."),
     ] = False,
+    scripts: Annotated[
+        bool,
+        typer.Option("--scripts", "-sC", help="Run nmap's default NSE scripts (-sC) and include their output per port."),
+    ] = False,
     rustscan: Annotated[
         bool,
         typer.Option(
@@ -209,6 +213,7 @@ def check(
                 max_retries=max_retries,
                 skip_ping=skip_ping,
                 service_detection=not no_service,
+                scripts=scripts,
                 rustscan=rustscan,
                 rustscan_batch=rustscan_batch,
                 rustscan_timeout=rustscan_timeout,

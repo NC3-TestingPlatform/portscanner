@@ -24,6 +24,8 @@ def test_to_dict_structure(sample_report):
     assert ssh["port"] == 22
     assert ssh["state"] == "open"
     assert ssh["service"]["product"] == "OpenSSH"
+    assert ssh["service"]["cpe"] == ["cpe:/a:openbsd:openssh:6.6.1p1"]
+    assert any(s.get("id") == "ssh-hostkey" for s in ssh["scripts"])
 
 
 def test_print_full_report_contains_key_facts(sample_report):
@@ -35,6 +37,8 @@ def test_print_full_report_contains_key_facts(sample_report):
     assert "ssh" in text
     assert "OpenSSH" in text
     assert "Summary" in text
+    # NSE script output is rendered in the panel
+    assert "ssh-hostkey" in text
 
 
 def test_print_full_report_no_hosts():

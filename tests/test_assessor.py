@@ -28,6 +28,21 @@ def test_assess_converts_hosts(mocker, sample_hosts):
     assert ssh.service.describe() == "OpenSSH 6.6.1p1 (Ubuntu)"
 
 
+def test_assess_scripts_flag_adds_sc(mocker, sample_hosts):
+    spy = mocker.patch.object(assessor, "run_scan", return_value=(sample_hosts, False))
+    assess(["scanme.nmap.org"], scripts=True)
+    _, kwargs = spy.call_args
+    assert "-sC" in kwargs["args"]
+
+
+def test_assess_surfaces_cpe_and_scripts(mocker, sample_hosts):
+    mocker.patch.object(assessor, "run_scan", return_value=(sample_hosts, False))
+    report = assess(["scanme.nmap.org"])
+    ssh = next(p for p in report.hosts[0].ports if p.port == 22)
+    assert ssh.service.cpe == ["cpe:/a:openbsd:openssh:6.6.1p1"]
+    assert any(s.get("id") == "ssh-hostkey" for s in ssh.scripts)
+
+
 def test_assess_passes_args_and_timeout(mocker, sample_hosts):
     spy = mocker.patch.object(assessor, "run_scan", return_value=(sample_hosts, False))
     assess("host", ports="22,80", timeout=42.0)

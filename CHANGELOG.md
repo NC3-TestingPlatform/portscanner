@@ -9,7 +9,21 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+- Remaining Tier 2 items: per-host port targeting (scan each host only for its
+  own rustscan-discovered ports, instead of the global union), and IPv6 (`-6`) /
+  UDP (`-sU`) support.
+
 ---
+
+## [0.5.0] — 2026-07-09
+
+### Added
+- `--scripts` / `-sC`: run nmap's default NSE scripts. Results surface per port
+  in the Rich report and in `--json` (new `scripts` list on each port).
+  `assess()` gains a keyword-only `scripts` parameter.
+- Service CPEs are now captured. nmap2json drops the `<cpe>` child elements, so
+  `parse_nmap_xml` re-walks the XML and attaches them; `ServiceInfo.cpe` is
+  populated again (and appears in `--json`).
 
 ## [0.4.3] — 2026-07-09
 
@@ -144,7 +158,8 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Test suite (60 tests) with I/O mocked at the `run_scan` / `subprocess.run`
   boundary.
 
-[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.3...v0.5.0
 [0.4.3]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.0...v0.4.1

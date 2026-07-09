@@ -57,6 +57,14 @@ def test_check_target_file(mocker, sample_report, tmp_path):
     assert kwargs["target_file"] == str(f)
 
 
+def test_check_scripts_flag(mocker, sample_report):
+    spy = mocker.patch.object(cli, "assess", return_value=sample_report)
+    result = runner.invoke(app, ["check", "host", "-sC"])
+    assert result.exit_code == 0
+    _, kwargs = spy.call_args
+    assert kwargs["scripts"] is True
+
+
 def test_check_rustscan_flag(mocker, sample_report):
     spy = mocker.patch.object(cli, "assess", return_value=sample_report)
     result = runner.invoke(app, ["check", "1.2.3.4", "--rustscan"])

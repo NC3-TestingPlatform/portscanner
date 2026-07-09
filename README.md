@@ -14,7 +14,7 @@ $ portscanner check scanme.nmap.org
 ```
 
 ![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)
-![Tests](https://img.shields.io/badge/tests-106%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-111%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPLv3-lightgrey)
 
@@ -42,7 +42,8 @@ Part of the [NC3-TestingPlatform](https://github.com/NC3-TestingPlatform).
 | **Multiple targets** | Scan any number of targets in one run — on the command line and/or from a file (`--target-file` / `-iL`). |
 | **Fast mode (`--rustscan`)** | Two-phase scan: rustscan sweeps all ports fast, then nmap runs service detection **only** on the ports rustscan found open. TCP connect scan — no root needed. |
 | **Port scan** | TCP connect scan (`nmap -sT`) — no root required. |
-| **Service/version detection** | On by default (`nmap -sV`); disable with `--no-service`. |
+| **Service/version detection** | On by default (`nmap -sV`); disable with `--no-service`. Detected CPEs are captured per service. |
+| **NSE scripts** | `--scripts` / `-sC` runs nmap's default scripts (banner grabs, `ssl-cert`, `http-title`, …); results surface per port in the report and JSON. |
 | **Scope control** | `--ports 22,80,443`, `--ports 1-1024`, or `--top-ports N`. |
 | **Tuning** | `--timing 0-5` (`-T`), `--host-timeout`, `--max-retries`, `--skip-ping` (`-Pn`). |
 | **Stable hashes** | Each host and port carries nmap2json's `hsh256` (stable across runs, timestamps excluded) for diffing scans over time. |
@@ -147,6 +148,7 @@ portscanner --version    # or -V
 | `--max-retries N` | Cap probe retransmissions. |
 | `--skip-ping` | Skip host discovery, treat every host as up (`-Pn`). |
 | `--no-service` | Disable service/version detection (`-sV` is on by default). |
+| `-sC`, `--scripts` | Run nmap's default NSE scripts (`-sC`) and include their output per port. |
 | `--rustscan` | Fast two-phase scan: rustscan discovers open ports, then nmap fingerprints only those. No root; not combinable with `--ports`/`--top-ports`. |
 | `--rustscan-batch N` | rustscan parallel batch size (`--batch-size`). |
 | `--rustscan-timeout MS` | rustscan per-port timeout in milliseconds (`--timeout`). |
@@ -198,6 +200,7 @@ assess(
     max_retries=None,      # "--max-retries"
     skip_ping=False,       # "-Pn"
     service_detection=True,# "-sV"
+    scripts=False,         # "-sC" default NSE scripts
     rustscan=False,        # two-phase rustscan→nmap discovery
     rustscan_batch=None,   # rustscan --batch-size
     rustscan_timeout=None, # rustscan per-port --timeout (ms)
@@ -241,6 +244,6 @@ pytest --tb=short -q      # quick run
 ruff check portscanner/   # lint
 ```
 
-The test suite has **106 tests**. Network and subprocess I/O are mocked at the
+The test suite has **111 tests**. Network and subprocess I/O are mocked at the
 `nmap_utils` / `rustscan_utils` / `subprocess.run` boundaries, so tests never
 launch nmap or rustscan.

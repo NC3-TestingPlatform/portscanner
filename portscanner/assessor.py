@@ -101,12 +101,14 @@ def _to_service(raw: dict | None) -> ServiceInfo | None:
     """
     if not raw:
         return None
+    cpe = raw.get("cpe")
     return ServiceInfo(
         name=raw.get("name"),
         product=raw.get("product"),
         version=raw.get("version"),
         extrainfo=raw.get("extrainfo"),
         method=raw.get("method"),
+        cpe=list(cpe) if isinstance(cpe, list) else [],
     )
 
 
@@ -123,12 +125,14 @@ def _to_port(raw: dict) -> PortResult:
     except (TypeError, ValueError):
         port_num = 0
     state_raw = raw.get("state") or {}
+    scripts = raw.get("scripts")
     return PortResult(
         port=port_num,
         protocol=raw.get("protocol") or "tcp",
         state=PortState.from_nmap(state_raw.get("state")),
         reason=state_raw.get("reason"),
         service=_to_service(raw.get("service")),
+        scripts=list(scripts) if isinstance(scripts, list) else [],
         hsh256=raw.get("hsh256"),
     )
 
@@ -218,6 +222,7 @@ def assess(
     max_retries: int | None = None,
     skip_ping: bool = False,
     service_detection: bool = True,
+    scripts: bool = False,
     rustscan: bool = False,
     rustscan_batch: int | None = None,
     rustscan_timeout: int | None = None,
@@ -249,6 +254,8 @@ def assess(
     :param max_retries: Cap on probe retransmissions (``--max-retries``).
     :param skip_ping: Skip host discovery and treat hosts as up (``-Pn``).
     :param service_detection: Enable service/version detection (``-sV``).
+    :param scripts: Run nmap's default NSE scripts (``-sC``); results surface on
+        each :class:`~portscanner.models.PortResult` as ``scripts``.
     :param rustscan: Run a rustscan fast-discovery phase before nmap.
     :param rustscan_batch: rustscan parallel batch size (``--batch-size``).
     :param rustscan_timeout: rustscan per-port timeout in ms (``--timeout``).
@@ -313,6 +320,7 @@ def assess(
             # skipping their service scan even though ports were just found open.
             skip_ping=True,
             service_detection=service_detection,
+            scripts=scripts,
         )
         command = f"{rustscan_cmd} && {shlex.join(build_command(target_list, args))}"
     else:
@@ -324,6 +332,7 @@ def assess(
             max_retries=max_retries,
             skip_ping=skip_ping,
             service_detection=service_detection,
+            scripts=scripts,
         )
         command = shlex.join(build_command(target_list, args))
         label = (

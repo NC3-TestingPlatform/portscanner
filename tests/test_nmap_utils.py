@@ -32,6 +32,11 @@ def test_build_args_skip_ping():
     assert "-Pn" in build_nmap_args(skip_ping=True)
 
 
+def test_build_args_scripts():
+    assert "-sC" in build_nmap_args(scripts=True)
+    assert "-sC" not in build_nmap_args()
+
+
 def test_build_args_ports():
     args = build_nmap_args(ports="22,80,443")
     assert "-p" in args and "22,80,443" in args
@@ -89,6 +94,13 @@ def test_parse_sample(sample_xml):
     assert hosts[0]["addr"] == "45.33.32.156"
     assert hosts[0]["status"]["state"] == "up"
     assert len(hosts[0]["ports"]) == 2
+
+
+def test_parse_attaches_cpe_and_scripts(sample_xml):
+    hosts = parse_nmap_xml(sample_xml)
+    ssh = next(p for p in hosts[0]["ports"] if p["portid"] == "22")
+    assert ssh["service"]["cpe"] == ["cpe:/a:openbsd:openssh:6.6.1p1"]
+    assert any(s.get("id") == "ssh-hostkey" for s in ssh.get("scripts", []))
 
 
 # --- read_targets_file ------------------------------------------------------

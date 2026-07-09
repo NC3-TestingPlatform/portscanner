@@ -70,7 +70,9 @@ def to_dict(report: ScanReport) -> dict:
                             "version": p.service.version,
                             "extrainfo": p.service.extrainfo,
                             "method": p.service.method,
+                            "cpe": p.service.cpe,
                         },
+                        "scripts": p.scripts,
                     }
                     for p in h.ports
                 ],
@@ -133,7 +135,25 @@ def _host_panel(host: HostResult) -> Panel:
                 (svc.name if svc and svc.name else "—"),
                 (svc.describe() if svc else "") or "—",
             )
-        body = Group(state_line, table)
+        script_lines: list[str] = []
+        for p in host.ports:
+            for s in p.scripts:
+                sid = s.get("id", "script")
+                output = (s.get("output") or "").strip()
+                first = output.splitlines()[0].strip() if output else ""
+                script_lines.append(
+                    f"[dim]{p.port}/{p.protocol}[/dim] [cyan]{sid}[/cyan]"
+                    + (f": {first}" if first else "")
+                )
+        if script_lines:
+            body = Group(
+                state_line,
+                table,
+                Text.from_markup("[bold]scripts[/bold]"),
+                Text.from_markup("\n".join(script_lines)),
+            )
+        else:
+            body = Group(state_line, table)
     else:
         body = Group(state_line, Text.from_markup("[dim]No ports reported.[/dim]"))
 

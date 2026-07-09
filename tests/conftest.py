@@ -23,7 +23,10 @@ SAMPLE_XML = """<?xml version="1.0"?>
     <ports>
       <port protocol="tcp" portid="22">
         <state state="open" reason="syn-ack" reason_ttl="53"/>
-        <service name="ssh" product="OpenSSH" version="6.6.1p1" extrainfo="Ubuntu" method="probed" conf="10"/>
+        <service name="ssh" product="OpenSSH" version="6.6.1p1" extrainfo="Ubuntu" method="probed" conf="10">
+          <cpe>cpe:/a:openbsd:openssh:6.6.1p1</cpe>
+        </service>
+        <script id="ssh-hostkey" output="2048 SHA256:redacted"/>
       </port>
       <port protocol="tcp" portid="443">
         <state state="closed" reason="conn-refused" reason_ttl="0"/>

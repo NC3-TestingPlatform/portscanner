@@ -73,6 +73,8 @@ class ServiceInfo:
     :param version: Detected version string (e.g. ``"9.6p1"``).
     :param extrainfo: Free-form extra info nmap attached (e.g. ``"Ubuntu"``).
     :param method: How the service was determined (``"table"`` or ``"probed"``).
+    :param cpe: CPE identifiers nmap emitted for the service (from ``<cpe>``
+        child elements), or an empty list.
     """
 
     name: str | None = None
@@ -80,6 +82,7 @@ class ServiceInfo:
     version: str | None = None
     extrainfo: str | None = None
     method: str | None = None
+    cpe: list[str] = field(default_factory=list)
 
     def describe(self) -> str:
         """Return a compact one-line human description of the service.
@@ -103,6 +106,9 @@ class PortResult:
     :param state: Port state (open/closed/filtered/…).
     :param reason: Why nmap assigned that state (e.g. ``"syn-ack"``).
     :param service: Detected service metadata, or ``None`` when unavailable.
+    :param scripts: NSE script results for this port (from ``-sC``/``--scripts``),
+        each a dict with at least ``id`` and ``output`` keys; empty when no
+        scripts ran.
     :param hsh256: Stable per-port SHA-256 hash from nmap2json (diff-friendly).
     """
 
@@ -111,6 +117,7 @@ class PortResult:
     state: PortState = PortState.UNKNOWN
     reason: str | None = None
     service: ServiceInfo | None = None
+    scripts: list[dict] = field(default_factory=list)
     hsh256: str | None = None
 
 

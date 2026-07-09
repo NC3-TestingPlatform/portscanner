@@ -36,6 +36,7 @@ def build_nmap_args(
     max_retries: int | None = None,
     skip_ping: bool = False,
     service_detection: bool = True,
+    scripts: bool = False,
 ) -> list[str]:
     """Build the nmap flag list (excluding the binary, ``-oX -``, and target).
 
@@ -56,6 +57,8 @@ def build_nmap_args(
         treat every host as online.
     :param service_detection: When ``True`` (default), add ``-sV`` for
         service/version detection.
+    :param scripts: When ``True``, add ``-sC`` to run nmap's default NSE
+        scripts (banner grabs, ``ssl-cert``, ``http-title``, …).
     :returns: Ordered list of nmap arguments.
     :rtype: list[str]
     :raises ValueError: If *timing* is out of range, or both *ports* and
@@ -71,6 +74,8 @@ def build_nmap_args(
     args: list[str] = ["-sT"]
     if service_detection:
         args.append("-sV")
+    if scripts:
+        args.append("-sC")
     if skip_ping:
         args.append("-Pn")
     if ports:
@@ -105,8 +110,45 @@ def parse_nmap_xml(xml_text: str) -> list[dict]:
     # ``ElementTree``) works. Wrap the safely-parsed root in an ``ElementTree``
     # and hand it straight to the library's core converter to get the same
     # result without writing the XML to a temp file first.
-    tree = ET.ElementTree(DET.fromstring(text))
-    return nmap_to_json(tree)
+    root = DET.fromstring(text)
+    hosts = nmap_to_json(ET.ElementTree(root))
+    _attach_cpes(root, hosts)
+    return hosts
+
+
+def _attach_cpes(root: ET.Element, hosts: list[dict]) -> None:
+    """Attach `<service><cpe>` values to each parsed port's service dict.
+
+    nmap2json copies only the ``<service>`` *attributes*, dropping the ``<cpe>``
+    child elements. Re-walk the tree and merge CPEs into the matching port's
+    ``service`` dict (keyed by address + protocol + portid), so they surface in
+    :class:`~portscanner.models.ServiceInfo`.
+
+    :param root: The parsed nmap ``<nmaprun>`` root element.
+    :param hosts: The host dicts returned by nmap2json (mutated in place).
+    """
+    cpe_by_key: dict[tuple[str, str, str], list[str]] = {}
+    for host_el in root.findall("host"):
+        addr_el = host_el.find("address")
+        addr = addr_el.get("addr") if addr_el is not None else None
+        if not addr:
+            continue
+        for port_el in host_el.findall("ports/port"):
+            proto = port_el.get("protocol") or ""
+            portid = port_el.get("portid") or ""
+            cpes = [c.text for c in port_el.findall("service/cpe") if c.text]
+            if cpes:
+                cpe_by_key[(addr, proto, portid)] = cpes
+
+    if not cpe_by_key:
+        return
+    for host in hosts:
+        addr = host.get("addr")
+        for port in host.get("ports") or []:
+            key = (addr, port.get("protocol") or "", str(port.get("portid") or ""))
+            cpes = cpe_by_key.get(key)
+            if cpes and isinstance(port.get("service"), dict):
+                port["service"]["cpe"] = cpes
 
 
 def read_targets_file(path: str) -> list[str]:
