@@ -55,6 +55,32 @@ def test_check_target_file(mocker, sample_report, tmp_path):
     assert kwargs["target_file"] == str(f)
 
 
+def test_check_masscan_flag(mocker, sample_report):
+    spy = mocker.patch.object(cli, "assess", return_value=sample_report)
+    result = runner.invoke(app, ["check", "1.2.3.4", "--masscan"])
+    assert result.exit_code == 0
+    _, kwargs = spy.call_args
+    assert kwargs["masscan"] is True
+
+
+def test_check_masscan_rate_and_ports(mocker, sample_report):
+    spy = mocker.patch.object(cli, "assess", return_value=sample_report)
+    result = runner.invoke(
+        app,
+        ["check", "1.2.3.4", "--masscan", "--masscan-rate", "5000", "--masscan-ports", "1-1000"],
+    )
+    assert result.exit_code == 0
+    _, kwargs = spy.call_args
+    assert kwargs["masscan_rate"] == 5000
+    assert kwargs["masscan_ports"] == "1-1000"
+
+
+def test_check_masscan_with_ports_exit_1():
+    # assess() raises ValueError before any subprocess runs → exit 1
+    result = runner.invoke(app, ["check", "1.2.3.4", "--masscan", "-p", "22"])
+    assert result.exit_code == 1
+
+
 def test_check_no_targets_and_no_file_exit_1():
     result = runner.invoke(app, ["check"])
     assert result.exit_code == 1

@@ -11,6 +11,30 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [0.3.0] — 2026-07-09
+
+### Added
+- `--masscan`: optional two-phase fast scan. masscan sweeps the port range
+  (full range by default) to discover open ports, then nmap runs service/
+  version detection **only** on the union of ports masscan reported open —
+  much faster than nmap sweeping a wide range itself. Requires root /
+  `CAP_NET_RAW` for masscan.
+- `--masscan-rate` (packets/sec, default 1000) and `--masscan-ports`
+  (discovery range, default `1-65535`) to tune the masscan phase.
+- `assess()` gains keyword-only `masscan`, `masscan_rate`, and `masscan_ports`
+  parameters.
+- `masscan` added to the tool registry shown by `portscanner info`; new
+  `portscanner/masscan_utils.py` I/O boundary (hostname→IP resolution, masscan
+  subprocess, `-oL` parsing).
+
+### Notes
+- `--masscan` cannot be combined with `--ports`/`--top-ports` (use
+  `--masscan-ports` for the discovery range).
+- Hostname targets are resolved to IPs for masscan (which scans IPs/CIDRs, not
+  names); nmap still runs against the original targets.
+- A non-zero masscan exit (e.g. missing privileges) raises an error rather than
+  being reported as "no open ports".
+
 ## [0.2.0] — 2026-07-09
 
 ### Added
@@ -49,6 +73,7 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Test suite (60 tests) with I/O mocked at the `run_scan` / `subprocess.run`
   boundary.
 
-[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/NC3-TestingPlatform/portscanner/releases/tag/v0.1.0

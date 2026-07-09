@@ -21,6 +21,10 @@ def test_get_install_hint_known_tool():
 
 
 def test_get_install_hint_unknown_tool():
-    hint = constants.get_install_hint("masscan")
-    assert "masscan" in hint
+    hint = constants.get_install_hint("rustscan")
+    assert "rustscan" in hint
     assert "PATH" in hint
+
+
+def test_required_tools_contains_masscan():
+    assert "masscan" in constants.REQUIRED_TOOLS

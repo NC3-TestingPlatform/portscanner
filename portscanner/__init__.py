@@ -7,7 +7,7 @@ from importlib.metadata import PackageNotFoundError, version
 try:
     __version__ = version("portscanner")
 except PackageNotFoundError:  # pragma: no cover – only when package not installed
-    __version__ = "0.2.0"
+    __version__ = "0.3.0"
 
 # NullHandler so library users who have not configured logging
 # do not see "No handler found" warnings (logging HOWTO).

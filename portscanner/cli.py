@@ -129,6 +129,21 @@ def check(
         bool,
         typer.Option("--no-service", help="Disable service/version detection (-sV is on by default)."),
     ] = False,
+    masscan: Annotated[
+        bool,
+        typer.Option(
+            "--masscan",
+            help="Fast two-phase scan: discover open ports with masscan (needs root/CAP_NET_RAW), then run nmap service detection only on those ports. Not combinable with --ports/--top-ports.",
+        ),
+    ] = False,
+    masscan_rate: Annotated[
+        Optional[int],
+        typer.Option("--masscan-rate", help="masscan transmit rate in packets/sec (default 1000)."),
+    ] = None,
+    masscan_ports: Annotated[
+        Optional[str],
+        typer.Option("--masscan-ports", help="Port range masscan sweeps for discovery (default 1-65535)."),
+    ] = None,
     output: Annotated[
         Optional[str],
         typer.Option(
@@ -183,6 +198,9 @@ def check(
                 max_retries=max_retries,
                 skip_ping=skip_ping,
                 service_detection=not no_service,
+                masscan=masscan,
+                masscan_rate=masscan_rate,
+                masscan_ports=masscan_ports,
                 timeout=timeout,
                 progress_cb=_progress_cb,
             )
@@ -229,7 +247,8 @@ def info() -> None:
         )
     console.print(table)
     console.print(
-        "[dim]nmap2json is a Python dependency (installed via pip), not a PATH binary.[/dim]"
+        "[dim]nmap is required; masscan is optional (only for --masscan, and needs "
+        "root/CAP_NET_RAW). nmap2json is a Python dependency (pip), not a PATH binary.[/dim]"
     )
 
 

@@ -96,6 +96,55 @@ def test_assess_ports_and_top_ports_raises_value_error():
         assess("host", ports="22", top_ports=10)
 
 
+def test_assess_masscan_then_nmap(mocker, sample_hosts):
+    mocker.patch.object(
+        assessor, "run_scan_masscan", return_value=([22, 80], "masscan 1.2.3.4 -oL -")
+    )
+    nmap_spy = mocker.patch.object(
+        assessor, "run_scan", return_value=(sample_hosts, False)
+    )
+    report = assessor.assess(["scanme.nmap.org"], masscan=True)
+
+    # nmap must be restricted to exactly the ports masscan discovered
+    _, kwargs = nmap_spy.call_args
+    assert "-p" in kwargs["args"]
+    assert kwargs["args"][kwargs["args"].index("-p") + 1] == "22,80"
+    assert "masscan" in report.command and "nmap" in report.command
+    assert len(report.hosts) == 1
+
+
+def test_assess_masscan_no_open_ports_skips_nmap(mocker):
+    mocker.patch.object(
+        assessor, "run_scan_masscan", return_value=([], "masscan 1.2.3.4 -oL -")
+    )
+    nmap_spy = mocker.patch.object(assessor, "run_scan")
+    report = assessor.assess(["1.2.3.4"], masscan=True)
+
+    nmap_spy.assert_not_called()
+    assert report.hosts == []
+    assert report.command == "masscan 1.2.3.4 -oL -"
+
+
+def test_assess_masscan_passes_rate_and_ports(mocker):
+    spy = mocker.patch.object(
+        assessor, "run_scan_masscan", return_value=([], "masscan")
+    )
+    assessor.assess(["1.2.3.4"], masscan=True, masscan_rate=5000, masscan_ports="80,443")
+    _, kwargs = spy.call_args
+    assert kwargs["rate"] == 5000
+    assert kwargs["ports"] == "80,443"
+
+
+def test_assess_masscan_with_ports_raises(mocker):
+    with pytest.raises(ValueError, match="masscan"):
+        assessor.assess(["1.2.3.4"], masscan=True, ports="22")
+
+
+def test_assess_masscan_with_top_ports_raises(mocker):
+    with pytest.raises(ValueError, match="masscan"):
+        assessor.assess(["1.2.3.4"], masscan=True, top_ports=100)
+
+
 def test_to_host_minimal_dict():
     host = _to_host({"addr": "1.2.3.4"})
     assert host.address == "1.2.3.4"

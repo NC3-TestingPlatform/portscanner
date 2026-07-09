@@ -16,7 +16,14 @@ import logging
 import shlex
 from typing import Callable, Iterable
 
-from portscanner.constants import DEFAULT_TIMEOUT, DEFAULT_TIMING, TARGET_RE
+from portscanner.constants import (
+    DEFAULT_MASSCAN_PORTS,
+    DEFAULT_MASSCAN_RATE,
+    DEFAULT_TIMEOUT,
+    DEFAULT_TIMING,
+    TARGET_RE,
+)
+from portscanner.masscan_utils import run_scan_masscan
 from portscanner.models import (
     HostResult,
     HostState,
@@ -164,51 +171,105 @@ def assess(
     max_retries: int | None = None,
     skip_ping: bool = False,
     service_detection: bool = True,
+    masscan: bool = False,
+    masscan_rate: int | None = None,
+    masscan_ports: str | None = None,
     timeout: float = DEFAULT_TIMEOUT,
     progress_cb: Callable[[str], None] | None = None,
 ) -> ScanReport:
     """Scan one or more *targets* with nmap and return a :class:`~portscanner.models.ScanReport`.
+
+    When *masscan* is enabled, a fast masscan sweep discovers open ports first
+    and nmap then runs service detection **only** on the union of ports masscan
+    reported open — much faster than nmap sweeping a wide range itself. masscan
+    needs root / ``CAP_NET_RAW``. If masscan finds no open ports, nmap is
+    skipped and a report with no hosts is returned.
 
     :param targets: A single target string or an iterable of targets — each a
         host, IP, or CIDR range (e.g. ``"scanme.nmap.org"``, ``"10.0.0.0/24"``).
     :param target_file: Optional path to a file listing targets (one or more
         per line; blank lines and ``#`` comments ignored). Targets from the file
         are merged with *targets* and de-duplicated.
-    :param ports: Explicit ``-p`` port spec; mutually exclusive with *top_ports*.
+    :param ports: Explicit ``-p`` port spec; mutually exclusive with *top_ports*
+        and with *masscan*.
     :param top_ports: Scan nmap's N most common ports (``--top-ports``);
-        mutually exclusive with *ports*. When neither is given, nmap's default
-        top-1000 ports are scanned.
+        mutually exclusive with *ports* and with *masscan*. When neither is
+        given (and *masscan* is off), nmap's default top-1000 ports are scanned.
     :param timing: nmap timing template 0–5 (``-T<n>``); defaults to 4.
     :param host_timeout: Per-host time budget in seconds (``--host-timeout``).
     :param max_retries: Cap on probe retransmissions (``--max-retries``).
     :param skip_ping: Skip host discovery and treat hosts as up (``-Pn``).
     :param service_detection: Enable service/version detection (``-sV``).
-    :param timeout: Overall subprocess timeout in seconds for the nmap run.
+    :param masscan: Run a masscan fast-discovery phase before nmap.
+    :param masscan_rate: masscan transmit rate in packets/sec (default 1000).
+    :param masscan_ports: Port range masscan sweeps for discovery (default the
+        full range ``1-65535``).
+    :param timeout: Per-process subprocess timeout in seconds (applied to the
+        masscan run and the nmap run independently).
     :param progress_cb: Optional callback invoked with progress strings.
     :returns: Completed scan report (inventory only — no grade/severity).
     :rtype: ScanReport
-    :raises ValueError: For missing/invalid targets or scan parameters.
-    :raises RuntimeError: If nmap is unavailable or its output cannot be parsed.
+    :raises ValueError: For missing/invalid targets or scan parameters (e.g.
+        combining ``--masscan`` with ``--ports``/``--top-ports``).
+    :raises RuntimeError: If a scanner is unavailable, masscan lacks privileges,
+        or nmap output cannot be parsed.
     """
     target_list = _collect_targets(targets, target_file)
-
-    args = build_nmap_args(
-        ports=ports,
-        top_ports=top_ports,
-        timing=timing,
-        host_timeout=host_timeout,
-        max_retries=max_retries,
-        skip_ping=skip_ping,
-        service_detection=service_detection,
-    )
-    command = shlex.join(build_command(target_list, args))
 
     def _cb(msg: str) -> None:
         if progress_cb:
             progress_cb(msg)
 
-    label = target_list[0] if len(target_list) == 1 else f"{len(target_list)} targets"
-    _cb(f"Scanning {label}…")
+    if masscan:
+        if ports or top_ports is not None:
+            raise ValueError(
+                "--ports/--top-ports cannot be combined with --masscan; "
+                "use --masscan-ports to set the discovery range."
+            )
+        discovery_ports = masscan_ports or DEFAULT_MASSCAN_PORTS
+        rate = masscan_rate if masscan_rate is not None else DEFAULT_MASSCAN_RATE
+        open_ports, masscan_cmd = run_scan_masscan(
+            target_list,
+            ports=discovery_ports,
+            rate=rate,
+            timeout=timeout,
+            progress_cb=progress_cb,
+        )
+        if not open_ports:
+            _cb("masscan found no open ports.")
+            return ScanReport(
+                targets=target_list,
+                command=masscan_cmd,
+                hosts=[],
+                timed_out=False,
+            )
+        _cb(f"masscan found {len(open_ports)} open port(s); running nmap…")
+        nmap_ports = ",".join(str(p) for p in open_ports)
+        args = build_nmap_args(
+            ports=nmap_ports,
+            timing=timing,
+            host_timeout=host_timeout,
+            max_retries=max_retries,
+            skip_ping=skip_ping,
+            service_detection=service_detection,
+        )
+        command = f"{masscan_cmd} && {shlex.join(build_command(target_list, args))}"
+    else:
+        args = build_nmap_args(
+            ports=ports,
+            top_ports=top_ports,
+            timing=timing,
+            host_timeout=host_timeout,
+            max_retries=max_retries,
+            skip_ping=skip_ping,
+            service_detection=service_detection,
+        )
+        command = shlex.join(build_command(target_list, args))
+        label = (
+            target_list[0] if len(target_list) == 1 else f"{len(target_list)} targets"
+        )
+        _cb(f"Scanning {label}…")
+
     raw_hosts, timed_out = run_scan(
         target_list, args=args, timeout=timeout, progress_cb=progress_cb
     )
