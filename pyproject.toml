@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "portscanner"
-version = "0.4.1"
+version = "0.4.2"
 description = "Port scanning CLI: nmap-driven port/service inventory parsed via nmap2json"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -47,7 +47,7 @@ dependencies = [
 Homepage = "https://github.com/NC3-TestingPlatform/portscanner"
 Repository = "https://github.com/NC3-TestingPlatform/portscanner"
 Issues = "https://github.com/NC3-TestingPlatform/portscanner/issues"
-Changelog = "https://github.com/NC3-TestingPlatform/portscanner/blob/master/CHANGELOG.md"
+Changelog = "https://github.com/NC3-TestingPlatform/portscanner/blob/main/CHANGELOG.md"
 
 [project.scripts]
 portscanner = "portscanner.cli:app"

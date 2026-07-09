@@ -11,6 +11,17 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [0.4.2] — 2026-07-09
+
+### Fixed
+- Docs: the `Changelog` project URL in `pyproject.toml` pointed at `blob/master`
+  (the default branch is `main`) and 404'd — now `blob/main`.
+
+### Changed
+- Docs: refreshed the `cli.py` module docstring to cover multiple targets,
+  `--target-file`, and `--rustscan`; corrected stale `CLAUDE.md` notes (the
+  `info` command lists nmap *and* rustscan; generic test-count guidance).
+
 ## [0.4.1] — 2026-07-09
 
 ### Fixed
@@ -113,7 +124,8 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Test suite (60 tests) with I/O mocked at the `run_scan` / `subprocess.run`
   boundary.
 
-[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.2.0...v0.3.0

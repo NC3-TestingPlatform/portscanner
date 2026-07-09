@@ -220,8 +220,8 @@ cannot be parsed.
 portscanner/
   cli.py          → Typer entry point; validation, flags, progress, output
   assessor.py     → Public API: assess(...) → ScanReport; dict→model conversion
-  nmap_utils.py   → nmap I/O boundary: build_nmap_args(), run_scan(), parse_nmap_xml()
-  rustscan_utils.py→ rustscan I/O boundary: build_rustscan_args(), run_scan_rustscan(), parse_rustscan_greppable()
+  nmap_utils.py     → nmap I/O boundary: build_nmap_args(), run_scan(), parse_nmap_xml()
+  rustscan_utils.py → rustscan I/O boundary: build_rustscan_args(), run_scan_rustscan(), parse_rustscan_greppable()
   models.py       → HostState/PortState enums; ServiceInfo/PortResult/HostResult/ScanReport
   constants.py    → REQUIRED_TOOLS registry; detect_tools(); get_install_hint()
   reporter.py     → Rich renderers; to_dict(); save_report()

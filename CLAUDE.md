@@ -19,7 +19,7 @@ pip install -e ".[dev]"                     # install in editable mode with dev 
 portscanner check scanme.nmap.org           # default scan (top-1000 TCP, -sT -sV)
 portscanner check 10.0.0.0/24 --top-ports 100 --skip-ping
 portscanner check example.com -p 22,80,443 --timing 3 --json
-portscanner info                            # show nmap availability
+portscanner info                            # show nmap / rustscan availability
 pytest                                      # run tests with coverage
 pytest --tb=short -q                        # quick run
 ```
@@ -29,8 +29,8 @@ pytest --tb=short -q                        # quick run
 portscanner/
   cli.py          → Typer entry point; target validation, flags, progress, output
   assessor.py     → Public API: assess(...) → ScanReport; nmap2json dict → model conversion
-  nmap_utils.py   → nmap I/O boundary: build_nmap_args(), build_command(), run_scan(), parse_nmap_xml(), read_targets_file()
-  rustscan_utils.py→ rustscan I/O boundary: build_rustscan_args(), run_scan_rustscan(), parse_rustscan_greppable()
+  nmap_utils.py     → nmap I/O boundary: build_nmap_args(), build_command(), run_scan(), parse_nmap_xml(), read_targets_file()
+  rustscan_utils.py → rustscan I/O boundary: build_rustscan_args(), run_scan_rustscan(), parse_rustscan_greppable()
   models.py       → HostState/PortState enums; ServiceInfo/PortResult/HostResult/ScanReport dataclasses
   constants.py    → REQUIRED_TOOLS registry; detect_tools(); get_install_hint(); defaults
   reporter.py     → Rich renderers; to_dict(); save_report()
@@ -127,7 +127,7 @@ pytest --tb=short -q          # tests pass at coverage target
 ruff check portscanner/       # lint clean
 ```
 - Update **CHANGELOG.md** (`## [Unreleased]`, or move to `## [x.y.z] — YYYY-MM-DD` on a bump).
-- If the test count changed, update the README badge + "60 tests" sentence and the count in this file.
+- If the test count changed, update the README badge + test-count sentence and the count in this file.
 - On a version bump, update **both** `pyproject.toml` and `portscanner/__init__.py` (the fallback `__version__`), then tag `vX.Y.Z` and create the GitHub release with `--notes-file`.
 
 ## Version Bumping (semver)

@@ -2,15 +2,18 @@
 
 Sub-commands
 ------------
-check   Run an nmap scan for a target and print the inventory report.
-info    Show whether nmap is available and how to install it.
+check   Scan one or more targets and print the inventory report.
+info    Show whether nmap / rustscan are available and how to install them.
 
 Usage example::
 
     portscanner check scanme.nmap.org
+    portscanner check scanme.nmap.org 10.0.0.1 192.168.1.0/24   # multiple targets
+    portscanner check --target-file targets.txt                 # or -iL
     portscanner check 10.0.0.0/24 --top-ports 100 --skip-ping
     portscanner check example.com -p 22,80,443 --timing 3 --json
     portscanner check host --host-timeout 30 --max-retries 2 --output report.html
+    portscanner check 10.0.0.0/24 --rustscan                    # fast rustscan → nmap
     portscanner info
 """
 
