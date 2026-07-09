@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "portscanner"
+version = "0.1.0"
+description = "Port scanning CLI: nmap-driven port/service inventory parsed via nmap2json"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0"
+license-files = ["LICENSE"]
+authors = [{ name = "NC3-TestingPlatform" }]
+keywords = [
+    "portscan",
+    "nmap",
+    "nmap2json",
+    "recon",
+    "ports",
+    "services",
+    "security",
+    "pentesting",
+    "cli",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: System :: Networking :: Monitoring",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
+dependencies = [
+    "defusedxml>=0.7",
+    "nmap2json>=2605.0",
+    "rich>=13.7",
+    "typer>=0.12",
+]
+
+[project.urls]
+Homepage = "https://github.com/NC3-TestingPlatform/portscanner"
+Repository = "https://github.com/NC3-TestingPlatform/portscanner"
+Issues = "https://github.com/NC3-TestingPlatform/portscanner/issues"
+Changelog = "https://github.com/NC3-TestingPlatform/portscanner/blob/master/CHANGELOG.md"
+
+[project.scripts]
+portscanner = "portscanner.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["portscanner*"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov>=5", "pytest-mock>=3.12"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "--cov=portscanner --cov-report=term-missing"

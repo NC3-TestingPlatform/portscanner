@@ -1,0 +1,234 @@
+"""portscanner CLI – nmap-driven port/service inventory.
+
+Sub-commands
+------------
+check   Run an nmap scan for a target and print the inventory report.
+info    Show whether nmap is available and how to install it.
+
+Usage example::
+
+    portscanner check scanme.nmap.org
+    portscanner check 10.0.0.0/24 --top-ports 100 --skip-ping
+    portscanner check example.com -p 22,80,443 --timing 3 --json
+    portscanner check host --host-timeout 30 --max-retries 2 --output report.html
+    portscanner info
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from typing import Annotated, Optional
+
+import typer
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
+from rich import box
+
+from portscanner import __version__
+from portscanner.assessor import assess
+from portscanner.constants import (
+    DEFAULT_TIMEOUT,
+    DEFAULT_TIMING,
+    REQUIRED_TOOLS,
+    detect_tools,
+    get_install_hint,
+)
+from portscanner.reporter import console, print_full_report, save_report, to_dict
+
+app = typer.Typer(
+    name="portscanner",
+    help="nmap-driven port and service inventory for a target host, IP, or range.",
+    add_completion=False,
+)
+
+_err = Console(stderr=True)
+
+# Lenient target matcher: hostnames, IPv4/IPv6 literals, and CIDR ranges all
+# use only these characters. The target is passed to nmap as a subprocess
+# argument (never through a shell), so this guards against obviously malformed
+# input rather than shell injection.
+_TARGET_RE = re.compile(r"^[A-Za-z0-9._:\-/]+$")
+
+
+def _validate_target(value: str) -> str:
+    value = value.strip()
+    if not value or not _TARGET_RE.match(value):
+        raise typer.BadParameter(f"Invalid target: {value!r}")
+    return value
+
+
+def version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"portscanner {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def _main(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            "-V",
+            callback=version_callback,
+            is_eager=True,
+            help="Print version and exit.",
+        ),
+    ] = False,
+) -> None:
+    pass
+
+
+# ---------------------------------------------------------------------------
+# check command
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def check(
+    target: Annotated[
+        str,
+        typer.Argument(help="Target host, IP, or CIDR range (e.g. scanme.nmap.org, 10.0.0.0/24)."),
+    ],
+    ports: Annotated[
+        Optional[str],
+        typer.Option(
+            "--ports",
+            "-p",
+            help="Port spec passed to nmap -p (e.g. 22,80,443 or 1-1024). Mutually exclusive with --top-ports.",
+        ),
+    ] = None,
+    top_ports: Annotated[
+        Optional[int],
+        typer.Option("--top-ports", help="Scan nmap's N most common ports. Mutually exclusive with --ports."),
+    ] = None,
+    timing: Annotated[
+        int,
+        typer.Option("--timing", help="nmap timing template 0–5 (-T<n>)."),
+    ] = DEFAULT_TIMING,
+    host_timeout: Annotated[
+        Optional[float],
+        typer.Option("--host-timeout", help="Give up on a host after this many seconds (--host-timeout)."),
+    ] = None,
+    max_retries: Annotated[
+        Optional[int],
+        typer.Option("--max-retries", help="Cap probe retransmissions (--max-retries)."),
+    ] = None,
+    skip_ping: Annotated[
+        bool,
+        typer.Option("--skip-ping", help="Skip host discovery and treat every host as online (-Pn)."),
+    ] = False,
+    no_service: Annotated[
+        bool,
+        typer.Option("--no-service", help="Disable service/version detection (-sV is on by default)."),
+    ] = False,
+    output: Annotated[
+        Optional[str],
+        typer.Option(
+            "--output",
+            "-o",
+            help=(
+                "Save the report to a file. Format is inferred from the extension: "
+                ".txt for plain text, .svg for SVG, .html for HTML."
+            ),
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print machine-readable JSON to stdout instead of Rich tables."),
+    ] = False,
+    timeout: Annotated[
+        float,
+        typer.Option("--timeout", help="Overall subprocess timeout for the nmap run, in seconds."),
+    ] = DEFAULT_TIMEOUT,
+) -> None:
+    """Run an nmap scan for TARGET and display the port/service inventory."""
+    target = _validate_target(target)
+
+    if ports and top_ports is not None:
+        _err.print("[red]Error:[/red] --ports and --top-ports are mutually exclusive.")
+        raise typer.Exit(code=1)
+
+    with Progress(SpinnerColumn(), TextColumn("{task.description}"), console=_err) as progress:
+        task = progress.add_task(f"Scanning {target}…", total=None)
+
+        def _progress_cb(msg: str) -> None:
+            progress.update(task, description=msg)
+
+        try:
+            report = assess(
+                target,
+                ports=ports,
+                top_ports=top_ports,
+                timing=timing,
+                host_timeout=host_timeout,
+                max_retries=max_retries,
+                skip_ping=skip_ping,
+                service_detection=not no_service,
+                timeout=timeout,
+                progress_cb=_progress_cb,
+            )
+        except ValueError as exc:
+            _err.print(f"[red]Error:[/red] {exc}")
+            raise typer.Exit(code=1)
+        except Exception as exc:
+            _err.print(f"[red]Connection/scan error:[/red] {exc}")
+            raise typer.Exit(code=2)
+
+    if json_output:
+        _print_json(report)
+        return
+
+    print_full_report(report, console=console)
+
+    if output:
+        try:
+            save_report(output)
+            console.print(f"[dim]Report saved to[/dim] {output}")
+        except (ValueError, OSError) as exc:
+            _err.print(f"[red]Error:[/red] Cannot write to {output!r}: {exc}")
+            raise typer.Exit(code=1)
+
+
+# ---------------------------------------------------------------------------
+# info command
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def info() -> None:
+    """Show whether the required external tools are available."""
+    availability = detect_tools()
+
+    table = Table("Tool", "Available", "Install hint", box=box.SIMPLE_HEAD)
+    for name in sorted(REQUIRED_TOOLS):
+        avail = availability.get(name, False)
+        style = "green" if avail else "red"
+        table.add_row(
+            name,
+            f"[{style}]{'yes' if avail else 'no'}[/{style}]",
+            get_install_hint(name) if not avail else "",
+        )
+    console.print(table)
+    console.print(
+        "[dim]nmap2json is a Python dependency (installed via pip), not a PATH binary.[/dim]"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+
+def _print_json(report) -> None:
+    """Serialise *report* to JSON and print it to stdout via the console.
+
+    :param report: :class:`~portscanner.models.ScanReport` to serialise.
+    """
+    console.print(json.dumps(to_dict(report), indent=2))
+
+
+if __name__ == "__main__":  # pragma: no cover
+    app()
