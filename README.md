@@ -17,6 +17,7 @@ $ portscanner check scanme.nmap.org
 ![Tests](https://img.shields.io/badge/tests-111%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPLv3-lightgrey)
+![CI](https://github.com/NC3-TestingPlatform/portscanner/actions/workflows/ci.yml/badge.svg)
 
 Part of the [NC3-TestingPlatform](https://github.com/NC3-TestingPlatform).
 
@@ -88,6 +89,19 @@ Check availability at any time:
 
 ```bash
 portscanner info
+```
+
+### Docker
+
+A container image bundles nmap (and, best-effort, rustscan) so you don't need
+the scanners on your host. Both use TCP connect scans, so no extra container
+capabilities are required.
+
+```bash
+docker build -t portscanner .
+docker run --rm portscanner check scanme.nmap.org --rustscan
+# save a report to the host via the /reports volume
+docker run --rm -v "$PWD/reports:/reports" portscanner check example.com -o /reports/example.html
 ```
 
 ---
