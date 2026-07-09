@@ -154,6 +154,99 @@ def test_assess_rustscan_with_top_ports_raises(mocker):
         assessor.assess(["1.2.3.4"], rustscan=True, top_ports=100)
 
 
+def test_assess_merges_same_ip_hosts(mocker):
+    # Two DNS names resolving to one IP → nmap emits two host blocks with the
+    # same addr. They must coalesce into a single host with merged hostnames.
+    raw = [
+        {
+            "addr": "31.22.122.93",
+            "hostnames": [{"name": "nc3.lu", "type": "user"}],
+            "status": {"state": "up"},
+            "ports": [
+                {"portid": "80", "protocol": "tcp", "state": {"state": "open"}},
+            ],
+        },
+        {
+            "addr": "31.22.122.93",
+            "hostnames": [{"name": "cybersecurity.lu", "type": "user"}],
+            "status": {"state": "up"},
+            "ports": [
+                {"portid": "443", "protocol": "tcp", "state": {"state": "open"}},
+            ],
+        },
+    ]
+    mocker.patch.object(assessor, "run_scan", return_value=(raw, False))
+    report = assess(["nc3.lu", "cybersecurity.lu"])
+
+    assert len(report.hosts) == 1
+    host = report.hosts[0]
+    assert host.address == "31.22.122.93"
+    assert host.hostnames == ["nc3.lu", "cybersecurity.lu"]
+    assert [p.port for p in host.ports] == [80, 443]
+
+
+def test_assess_merge_prefers_open_port(mocker):
+    # Same IP, same port reported closed in one block and open in another →
+    # the merged port must be open (with its service detail).
+    raw = [
+        {
+            "addr": "10.0.0.1",
+            "status": {"state": "up"},
+            "ports": [{"portid": "80", "protocol": "tcp", "state": {"state": "closed"}}],
+        },
+        {
+            "addr": "10.0.0.1",
+            "status": {"state": "up"},
+            "ports": [
+                {
+                    "portid": "80",
+                    "protocol": "tcp",
+                    "state": {"state": "open"},
+                    "service": {"name": "http"},
+                }
+            ],
+        },
+    ]
+    mocker.patch.object(assessor, "run_scan", return_value=(raw, False))
+    report = assess(["10.0.0.1"])
+    assert len(report.hosts) == 1
+    ports = report.hosts[0].ports
+    assert len(ports) == 1
+    assert ports[0].state == PortState.OPEN
+    assert ports[0].service is not None and ports[0].service.name == "http"
+
+
+def test_assess_merge_adopts_up_state(mocker):
+    # First block for the IP is down (no ports); a later block is up → merged
+    # host must be up and carry the discovered ports.
+    raw = [
+        {"addr": "10.0.0.1", "status": {"state": "down"}, "ports": []},
+        {
+            "addr": "10.0.0.1",
+            "status": {"state": "up", "reason": "syn-ack"},
+            "ports": [{"portid": "22", "protocol": "tcp", "state": {"state": "open"}}],
+        },
+    ]
+    mocker.patch.object(assessor, "run_scan", return_value=(raw, False))
+    report = assess(["10.0.0.1"])
+    assert len(report.hosts) == 1
+    host = report.hosts[0]
+    assert host.state == HostState.UP
+    assert host.reason == "syn-ack"
+    assert [p.port for p in host.ports] == [22]
+
+
+def test_assess_does_not_merge_addressless_hosts(mocker):
+    # Hosts with no address must not be collapsed together.
+    raw = [
+        {"addr": None, "status": {"state": "up"}, "ports": []},
+        {"addr": None, "status": {"state": "up"}, "ports": []},
+    ]
+    mocker.patch.object(assessor, "run_scan", return_value=(raw, False))
+    report = assess(["10.0.0.1"])
+    assert len(report.hosts) == 2
+
+
 def test_to_host_minimal_dict():
     host = _to_host({"addr": "1.2.3.4"})
     assert host.address == "1.2.3.4"

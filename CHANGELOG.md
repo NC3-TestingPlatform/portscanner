@@ -11,6 +11,20 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [0.4.1] — 2026-07-09
+
+### Fixed
+- Targets that resolve to the same IP (e.g. two DNS names for one server) are
+  no longer reported as separate hosts. nmap emits one host block per target,
+  so those blocks are now coalesced by address — hostnames and ports are
+  unioned — giving one host entry and accurate summary counts instead of
+  double-counting (previously "2 hosts / 6 open ports" for a single host).
+  Hosts with no address are never coalesced together.
+
+### Changed
+- The timed-out banner now reads "warning: scan timed out …" (plain text
+  instead of a warning glyph).
+
 ## [0.4.0] — 2026-07-09
 
 ### Changed
@@ -99,7 +113,8 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Test suite (60 tests) with I/O mocked at the `run_scan` / `subprocess.run`
   boundary.
 
-[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.1.0...v0.2.0

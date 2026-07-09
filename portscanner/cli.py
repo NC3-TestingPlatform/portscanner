@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -84,13 +84,13 @@ def _main(
 @app.command()
 def check(
     targets: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         typer.Argument(
             help="One or more targets — host, IP, or CIDR range (e.g. scanme.nmap.org 10.0.0.0/24). Optional when --target-file is given.",
         ),
     ] = None,
     target_file: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--target-file",
             "-iL",
@@ -98,7 +98,7 @@ def check(
         ),
     ] = None,
     ports: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--ports",
             "-p",
@@ -106,7 +106,7 @@ def check(
         ),
     ] = None,
     top_ports: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--top-ports", help="Scan nmap's N most common ports. Mutually exclusive with --ports."),
     ] = None,
     timing: Annotated[
@@ -114,11 +114,11 @@ def check(
         typer.Option("--timing", help="nmap timing template 0–5 (-T<n>)."),
     ] = DEFAULT_TIMING,
     host_timeout: Annotated[
-        Optional[float],
+        float | None,
         typer.Option("--host-timeout", help="Give up on a host after this many seconds (--host-timeout)."),
     ] = None,
     max_retries: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--max-retries", help="Cap probe retransmissions (--max-retries)."),
     ] = None,
     skip_ping: Annotated[
@@ -137,23 +137,23 @@ def check(
         ),
     ] = False,
     rustscan_batch: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--rustscan-batch", help="rustscan parallel batch size (--batch-size)."),
     ] = None,
     rustscan_timeout: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--rustscan-timeout", help="rustscan per-port timeout in milliseconds (--timeout)."),
     ] = None,
     rustscan_ports: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--rustscan-ports", help="Discovery port spec rustscan sweeps (default: its full range)."),
     ] = None,
     rustscan_ulimit: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--rustscan-ulimit", help="File-descriptor limit rustscan requests (--ulimit); raising it speeds up full-range scans."),
     ] = None,
     output: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--output",
             "-o",
@@ -169,7 +169,7 @@ def check(
     ] = False,
     timeout: Annotated[
         float,
-        typer.Option("--timeout", help="Overall subprocess timeout for the nmap run, in seconds."),
+        typer.Option("--timeout", help="Per-process subprocess timeout in seconds (applied to the rustscan and nmap runs independently)."),
     ] = DEFAULT_TIMEOUT,
 ) -> None:
     """Run an nmap scan for TARGETS and display the port/service inventory."""

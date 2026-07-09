@@ -154,6 +154,55 @@ def _to_host(raw: dict) -> HostResult:
     )
 
 
+def _merge_hosts_by_address(hosts: list[HostResult]) -> list[HostResult]:
+    """Coalesce hosts that share an address into one entry.
+
+    When several targets resolve to the same IP (e.g. two DNS names for one
+    server), nmap emits a separate ``<host>`` block per target. Those describe
+    the same machine, so they are merged: hostnames are unioned (order
+    preserved) and ports are unioned by ``(protocol, port)``, preferring an
+    open state and a populated service when the same port appears twice.
+
+    Hosts with no address (empty string) are never merged together — each is
+    kept as its own entry, since a missing address is not evidence that two
+    blocks describe the same machine.
+
+    :param hosts: Parsed host results, possibly with duplicate addresses.
+    :returns: One :class:`HostResult` per non-empty address, first-seen order
+        preserved; address-less hosts pass through individually.
+    :rtype: list[HostResult]
+    """
+    by_addr: dict[str, HostResult] = {}
+    merged: list[HostResult] = []
+    for host in hosts:
+        existing = by_addr.get(host.address) if host.address else None
+        if existing is None:
+            if host.address:
+                by_addr[host.address] = host
+            merged.append(host)
+            continue
+        for name in host.hostnames:
+            if name not in existing.hostnames:
+                existing.hostnames.append(name)
+        ports_by_key = {(p.protocol, p.port): p for p in existing.ports}
+        for port in host.ports:
+            key = (port.protocol, port.port)
+            current = ports_by_key.get(key)
+            if current is None:
+                existing.ports.append(port)
+                ports_by_key[key] = port
+            elif current.state != PortState.OPEN and port.state == PortState.OPEN:
+                # Prefer the open observation (and its service detail).
+                existing.ports[existing.ports.index(current)] = port
+                ports_by_key[key] = port
+        if existing.state != HostState.UP and host.state == HostState.UP:
+            existing.state = host.state
+            existing.reason = host.reason
+    for host in merged:
+        host.ports.sort(key=lambda p: (p.protocol, p.port))
+    return merged
+
+
 def assess(
     targets: str | Iterable[str],
     *,
@@ -203,8 +252,9 @@ def assess(
         full range).
     :param rustscan_ulimit: File-descriptor limit rustscan requests
         (``--ulimit``); raising it speeds up full-range scans.
-    :param timeout: Per-process subprocess timeout in seconds (applied to the
-        rustscan run and the nmap run independently).
+    :param timeout: Per-process subprocess timeout in seconds. It is applied to
+        the rustscan run and the nmap run **independently**, so a two-phase
+        ``rustscan`` scan can take up to roughly twice this value in total.
     :param progress_cb: Optional callback invoked with progress strings.
     :returns: Completed scan report (inventory only — no grade/severity).
     :rtype: ScanReport
@@ -243,6 +293,10 @@ def assess(
                 timed_out=False,
             )
         _cb(f"rustscan found {len(open_ports)} open port(s); running nmap…")
+        # Union of open ports across all hosts. When several distinct IPs are
+        # scanned, each is nmap-scanned for the whole union — nmap re-checks
+        # every port per host, so this cannot yield false "open" results, only
+        # some redundant probing of ports that were open on a different host.
         nmap_ports = ",".join(str(p) for p in open_ports)
         args = build_nmap_args(
             ports=nmap_ports,
@@ -273,7 +327,7 @@ def assess(
         target_list, args=args, timeout=timeout, progress_cb=progress_cb
     )
 
-    hosts = [_to_host(h) for h in raw_hosts]
+    hosts = _merge_hosts_by_address([_to_host(h) for h in raw_hosts])
     hosts.sort(key=lambda h: h.address)
     _cb(f"Parsed {len(hosts)} host(s).")
 

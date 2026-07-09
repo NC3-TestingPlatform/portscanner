@@ -156,7 +156,7 @@ def print_full_report(report: ScanReport, *, console: Console | None = None) -> 
     if report.command:
         con.print(f"  [dim]command:[/dim] {report.command}", highlight=False)
     if report.timed_out:
-        con.print("  [yellow]⚠ scan timed out — results may be partial[/yellow]")
+        con.print("  [yellow]warning: scan timed out — results may be partial[/yellow]")
     if report.error:
         con.print(f"  [red]error:[/red] {report.error}")
     con.print()

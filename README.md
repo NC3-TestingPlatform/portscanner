@@ -14,7 +14,7 @@ $ portscanner check scanme.nmap.org
 ```
 
 ![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)
-![Tests](https://img.shields.io/badge/tests-98%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-102%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPLv3-lightgrey)
 
@@ -152,7 +152,7 @@ portscanner --version    # or -V
 | `--rustscan-timeout MS` | rustscan per-port timeout in milliseconds (`--timeout`). |
 | `--rustscan-ports SPEC` | Discovery port spec rustscan sweeps (default: its full range). |
 | `--rustscan-ulimit N` | File-descriptor limit rustscan requests (`--ulimit`); raising it speeds up full-range scans. |
-| `--timeout S` | Overall subprocess timeout for the nmap run. |
+| `--timeout S` | Per-process subprocess timeout in seconds (applied to the rustscan and nmap runs independently). |
 | `--json` | Print machine-readable JSON instead of Rich tables. |
 | `-o`, `--output` | Save report; format inferred from extension (`.txt` / `.svg` / `.html`). |
 | `-V`, `--version` | Print version and exit. |
@@ -241,6 +241,6 @@ pytest --tb=short -q      # quick run
 ruff check portscanner/   # lint
 ```
 
-The test suite has **98 tests**. Network and subprocess I/O are mocked at the
+The test suite has **102 tests**. Network and subprocess I/O are mocked at the
 `nmap_utils` / `rustscan_utils` / `subprocess.run` boundaries, so tests never
 launch nmap or rustscan.
