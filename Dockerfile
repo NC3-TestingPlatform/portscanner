@@ -10,7 +10,10 @@ RUN apt-get update \
 
 # rustscan (optional, for --rustscan): install from crates.io via cargo.
 ENV CARGO_HOME=/opt/cargo PATH=/opt/cargo/bin:$PATH
-RUN cargo install rustscan \
+# --locked uses rustscan's published Cargo.lock so transitive deps match the
+# crate's MSRV (bare `cargo install` resolves newer deps, e.g. icu 2.2.0, that
+# need a rustc newer than the slim image's apt toolchain).
+RUN cargo install rustscan --locked \
     && rm -rf /opt/cargo/registry
 
 WORKDIR /app
