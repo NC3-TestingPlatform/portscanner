@@ -14,7 +14,7 @@ $ portscanner check scanme.nmap.org
 ```
 
 ![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)
-![Tests](https://img.shields.io/badge/tests-60%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-74%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPLv3-lightgrey)
 
@@ -39,6 +39,7 @@ Part of the [NC3-TestingPlatform](https://github.com/NC3-TestingPlatform).
 
 | Capability | What it does |
 | --- | --- |
+| **Multiple targets** | Scan any number of targets in one run — on the command line and/or from a file (`--target-file` / `-iL`). |
 | **Port scan** | TCP connect scan (`nmap -sT`) — no root required. |
 | **Service/version detection** | On by default (`nmap -sV`); disable with `--no-service`. |
 | **Scope control** | `--ports 22,80,443`, `--ports 1-1024`, or `--top-ports N`. |
@@ -103,6 +104,13 @@ portscanner info
 # Default: TCP connect + version detection, nmap's top-1000 ports
 portscanner check scanme.nmap.org
 
+# Several targets in one run (hosts, IPs, CIDR ranges)
+portscanner check scanme.nmap.org 10.0.0.1 192.168.1.0/24
+
+# Targets from a file (one or more per line; blank lines and '#' comments ignored)
+portscanner check --target-file targets.txt        # or -iL targets.txt
+portscanner check extra.example --target-file targets.txt   # file + CLI targets merged
+
 # A CIDR range, skipping host discovery, only the 100 most common ports
 portscanner check 10.0.0.0/24 --top-ports 100 --skip-ping
 
@@ -123,6 +131,8 @@ portscanner --version    # or -V
 
 | Flag | Meaning |
 | --- | --- |
+| `TARGETS...` | One or more targets (host / IP / CIDR). Optional when `--target-file` is given. |
+| `-iL`, `--target-file` | Read targets from a file (one or more per line; blank lines and `#` comments ignored). Merged with CLI targets. |
 | `-p`, `--ports` | nmap `-p` spec (e.g. `22,80,443` or `1-1024`). Mutually exclusive with `--top-ports`. |
 | `--top-ports N` | Scan nmap's N most common ports. |
 | `--timing N` | nmap timing template `0`–`5` (`-T`), default `4`. |
@@ -150,7 +160,10 @@ portscanner --version    # or -V
 ```python
 from portscanner.assessor import assess
 
+# A single target, several targets, or a file — all supported
 report = assess("scanme.nmap.org", top_ports=100, skip_ping=True)
+report = assess(["10.0.0.1", "10.0.0.2"], ports="22,80,443")
+report = assess([], target_file="targets.txt")
 
 for host in report.hosts:
     for port in host.open_ports:
@@ -158,13 +171,14 @@ for host in report.hosts:
         print(host.address, port.port, port.protocol, svc)
 ```
 
-`assess()` returns a `ScanReport`. All parameters after `target` are
-keyword-only:
+`assess()` returns a `ScanReport`. The first argument is a single target string
+or an iterable of targets; all remaining parameters are keyword-only:
 
 ```python
 assess(
-    target,
+    targets,               # str or iterable of str
     *,
+    target_file=None,      # path to a file of targets (merged with `targets`)
     ports=None,            # "-p" spec
     top_ports=None,        # "--top-ports"
     timing=4,              # "-T<n>"
@@ -209,5 +223,5 @@ pytest --tb=short -q      # quick run
 ruff check portscanner/   # lint
 ```
 
-The test suite has **60 tests**. Network and subprocess I/O are mocked at the
+The test suite has **74 tests**. Network and subprocess I/O are mocked at the
 `nmap_utils.run_scan` / `subprocess.run` boundary, so tests never launch nmap.

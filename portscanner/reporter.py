@@ -44,6 +44,7 @@ def to_dict(report: ScanReport) -> dict:
     :rtype: dict
     """
     return {
+        "targets": report.targets,
         "target": report.target,
         "command": report.command,
         "timed_out": report.timed_out,
@@ -150,7 +151,8 @@ def print_full_report(report: ScanReport, *, console: Console | None = None) -> 
     con = console or _console
     verdict = build_verdict(report)
 
-    con.rule(f"[bold cyan]Port Scan Report — {report.target}[/bold cyan]")
+    header_targets = ", ".join(report.targets) if report.targets else "(no targets)"
+    con.rule(f"[bold cyan]Port Scan Report — {header_targets}[/bold cyan]")
     if report.command:
         con.print(f"  [dim]command:[/dim] {report.command}", highlight=False)
     if report.timed_out:

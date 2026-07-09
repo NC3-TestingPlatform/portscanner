@@ -9,7 +9,14 @@ declared package dependency rather than a PATH binary.
 
 from __future__ import annotations
 
+import re
 import shutil
+
+# Lenient target matcher: hostnames, IPv4/IPv6 literals, and CIDR ranges all
+# use only these characters. Targets are passed to nmap as subprocess arguments
+# (never through a shell), so this guards against obviously malformed input
+# (embedded whitespace, shell metacharacters) rather than shell injection.
+TARGET_RE = re.compile(r"^[A-Za-z0-9._:\-/]+$")
 
 # External binaries the module shells out to. nmap2json is NOT listed here:
 # it is a Python dependency (see pyproject.toml), imported directly, not run

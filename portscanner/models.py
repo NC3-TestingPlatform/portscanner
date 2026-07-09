@@ -149,15 +149,29 @@ class HostResult:
 class ScanReport:
     """Aggregated scan result returned by :func:`portscanner.assessor.assess`.
 
-    :param target: The target that was scanned (host, IP, or CIDR range).
+    :param targets: The targets that were scanned (hosts, IPs, or CIDR ranges).
+        A single scan may cover many targets — passed on the command line and/or
+        read from a file — all handed to one nmap invocation.
     :param command: The exact nmap command line that was executed.
     :param hosts: Per-host results parsed from the nmap output.
     :param timed_out: ``True`` when the nmap process was killed on timeout.
     :param error: Error message if the scan failed; ``None`` on success.
     """
 
-    target: str
+    targets: list[str] = field(default_factory=list)
     command: str = ""
     hosts: list[HostResult] = field(default_factory=list)
     timed_out: bool = False
     error: str | None = None
+
+    @property
+    def target(self) -> str:
+        """Return the targets as a single space-joined expression.
+
+        Kept for convenient display and backward compatibility with callers
+        that expect a single scalar target string.
+
+        :returns: Space-joined target list (e.g. ``"host1 10.0.0.0/24"``).
+        :rtype: str
+        """
+        return " ".join(self.targets)

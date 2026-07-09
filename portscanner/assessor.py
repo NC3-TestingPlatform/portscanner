@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import logging
 import shlex
-from typing import Callable
+from typing import Callable, Iterable
 
-from portscanner.constants import DEFAULT_TIMEOUT, DEFAULT_TIMING
+from portscanner.constants import DEFAULT_TIMEOUT, DEFAULT_TIMING, TARGET_RE
 from portscanner.models import (
     HostResult,
     HostState,
@@ -25,9 +25,58 @@ from portscanner.models import (
     ScanReport,
     ServiceInfo,
 )
-from portscanner.nmap_utils import build_command, build_nmap_args, run_scan
+from portscanner.nmap_utils import (
+    build_command,
+    build_nmap_args,
+    read_targets_file,
+    run_scan,
+)
 
 logger = logging.getLogger("portscanner")
+
+
+def _collect_targets(
+    targets: str | Iterable[str] | None,
+    target_file: str | None,
+) -> list[str]:
+    """Merge, validate, and de-duplicate targets from args and/or a file.
+
+    :param targets: A single target string, an iterable of target strings, or
+        ``None``.
+    :param target_file: Optional path to a file of targets (see
+        :func:`portscanner.nmap_utils.read_targets_file`).
+    :returns: Ordered, de-duplicated list of validated targets.
+    :rtype: list[str]
+    :raises ValueError: If a target is malformed, the file cannot be read, or
+        no targets remain after merging.
+    """
+    if targets is None:
+        collected: list[str] = []
+    elif isinstance(targets, str):
+        collected = [targets]
+    else:
+        collected = [str(t) for t in targets]
+
+    if target_file:
+        collected.extend(read_targets_file(target_file))
+
+    seen: set[str] = set()
+    final: list[str] = []
+    for raw in collected:
+        target = raw.strip()
+        if not target:
+            continue
+        if not TARGET_RE.match(target):
+            raise ValueError(f"Invalid target: {target!r}")
+        if target not in seen:
+            seen.add(target)
+            final.append(target)
+
+    if not final:
+        raise ValueError(
+            "At least one target (or a non-empty --target-file) is required."
+        )
+    return final
 
 
 def _to_host_state(value: str | None) -> HostState:
@@ -105,8 +154,9 @@ def _to_host(raw: dict) -> HostResult:
 
 
 def assess(
-    target: str,
+    targets: str | Iterable[str],
     *,
+    target_file: str | None = None,
     ports: str | None = None,
     top_ports: int | None = None,
     timing: int = DEFAULT_TIMING,
@@ -117,10 +167,13 @@ def assess(
     timeout: float = DEFAULT_TIMEOUT,
     progress_cb: Callable[[str], None] | None = None,
 ) -> ScanReport:
-    """Scan *target* with nmap and return a :class:`~portscanner.models.ScanReport`.
+    """Scan one or more *targets* with nmap and return a :class:`~portscanner.models.ScanReport`.
 
-    :param target: Host, IP, or CIDR range to scan (e.g. ``"scanme.nmap.org"``,
-        ``"10.0.0.0/24"``).
+    :param targets: A single target string or an iterable of targets — each a
+        host, IP, or CIDR range (e.g. ``"scanme.nmap.org"``, ``"10.0.0.0/24"``).
+    :param target_file: Optional path to a file listing targets (one or more
+        per line; blank lines and ``#`` comments ignored). Targets from the file
+        are merged with *targets* and de-duplicated.
     :param ports: Explicit ``-p`` port spec; mutually exclusive with *top_ports*.
     :param top_ports: Scan nmap's N most common ports (``--top-ports``);
         mutually exclusive with *ports*. When neither is given, nmap's default
@@ -134,12 +187,10 @@ def assess(
     :param progress_cb: Optional callback invoked with progress strings.
     :returns: Completed scan report (inventory only — no grade/severity).
     :rtype: ScanReport
-    :raises ValueError: For an empty target or invalid scan parameters.
+    :raises ValueError: For missing/invalid targets or scan parameters.
     :raises RuntimeError: If nmap is unavailable or its output cannot be parsed.
     """
-    target = (target or "").strip()
-    if not target:
-        raise ValueError("A scan target (host, IP, or CIDR) is required.")
+    target_list = _collect_targets(targets, target_file)
 
     args = build_nmap_args(
         ports=ports,
@@ -150,15 +201,16 @@ def assess(
         skip_ping=skip_ping,
         service_detection=service_detection,
     )
-    command = shlex.join(build_command(target, args))
+    command = shlex.join(build_command(target_list, args))
 
     def _cb(msg: str) -> None:
         if progress_cb:
             progress_cb(msg)
 
-    _cb(f"Scanning {target}…")
+    label = target_list[0] if len(target_list) == 1 else f"{len(target_list)} targets"
+    _cb(f"Scanning {label}…")
     raw_hosts, timed_out = run_scan(
-        target, args=args, timeout=timeout, progress_cb=progress_cb
+        target_list, args=args, timeout=timeout, progress_cb=progress_cb
     )
 
     hosts = [_to_host(h) for h in raw_hosts]
@@ -166,7 +218,7 @@ def assess(
     _cb(f"Parsed {len(hosts)} host(s).")
 
     return ScanReport(
-        target=target,
+        targets=target_list,
         command=command,
         hosts=hosts,
         timed_out=timed_out,

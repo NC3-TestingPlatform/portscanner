@@ -24,7 +24,7 @@ def _report() -> ScanReport:
         ],
     )
     down_host = HostResult(address="10.0.0.2", state=HostState.DOWN)
-    return ScanReport(target="10.0.0.0/30", hosts=[up_host, down_host])
+    return ScanReport(targets=["10.0.0.0/30"], hosts=[up_host, down_host])
 
 
 def test_verdict_counts():
@@ -44,7 +44,7 @@ def test_verdict_summary_line_mentions_counts():
 
 
 def test_verdict_empty_report():
-    v = build_verdict(ScanReport(target="x"))
+    v = build_verdict(ScanReport(targets=["x"]))
     assert v.total_hosts == 0
     assert v.total_open_ports == 0
     assert "0 host" in v.summary_line

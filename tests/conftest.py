@@ -51,7 +51,7 @@ def sample_report(sample_hosts: list[dict]) -> ScanReport:
     """Return a :class:`ScanReport` built from the sample hosts."""
     hosts = [_to_host(h) for h in sample_hosts]
     return ScanReport(
-        target="scanme.nmap.org",
+        targets=["scanme.nmap.org"],
         command="nmap -sT -sV -oX - scanme.nmap.org",
         hosts=hosts,
     )

@@ -108,30 +108,61 @@ def parse_nmap_xml(xml_text: str) -> list[dict]:
     return nmap_to_json(tree)
 
 
-def build_command(target: str, args: list[str]) -> list[str]:
-    """Assemble the full nmap argv for *target* with pre-built *args*.
+def read_targets_file(path: str) -> list[str]:
+    """Read scan targets from a file, one (or more) per line.
 
-    :param target: The scan target (host, IP, or CIDR range).
+    Blank lines and lines beginning with ``#`` are skipped; each remaining line
+    is split on whitespace so multiple targets may share a line. Order is
+    preserved; de-duplication is left to the caller.
+
+    :param path: Path to the targets file.
+    :returns: List of raw (un-validated) target tokens.
+    :rtype: list[str]
+    :raises ValueError: If the file does not exist or cannot be read.
+    """
+    try:
+        with open(path, encoding="utf-8") as fh:
+            content = fh.read()
+    except FileNotFoundError:
+        raise ValueError(f"Target file not found: {path}")
+    except OSError as exc:
+        raise ValueError(f"Cannot read target file {path!r}: {exc}")
+
+    targets: list[str] = []
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        targets.extend(stripped.split())
+    return targets
+
+
+def build_command(targets: list[str], args: list[str]) -> list[str]:
+    """Assemble the full nmap argv for *targets* with pre-built *args*.
+
+    :param targets: The scan targets (hosts, IPs, or CIDR ranges); all are
+        passed to a single nmap invocation.
     :param args: Flag list from :func:`build_nmap_args`.
     :returns: Full command list ready for :func:`subprocess.run`.
     :rtype: list[str]
     """
-    return ["nmap", *args, "-oX", "-", target]
+    return ["nmap", *args, "-oX", "-", *targets]
 
 
 def run_scan(
-    target: str,
+    targets: list[str],
     *,
     args: list[str],
     timeout: float,
     progress_cb: Callable[[str], None] | None = None,
 ) -> tuple[list[dict], bool]:
-    """Run nmap against *target* and return parsed hosts plus a timeout flag.
+    """Run nmap against *targets* and return parsed hosts plus a timeout flag.
 
-    This is the single mocked boundary in tests. It launches nmap, captures its
-    XML output on stdout, and parses it via :func:`parse_nmap_xml`.
+    This is the single mocked boundary in tests. It launches nmap once for all
+    targets, captures its XML output on stdout, and parses it via
+    :func:`parse_nmap_xml`.
 
-    :param target: The scan target (host, IP, or CIDR range).
+    :param targets: The scan targets (hosts, IPs, or CIDR ranges).
     :param args: nmap flags from :func:`build_nmap_args`.
     :param timeout: Maximum seconds to wait for the whole nmap process.
     :param progress_cb: Optional callback for a progress message before launch.
@@ -141,9 +172,10 @@ def run_scan(
     :raises RuntimeError: If nmap is not installed, exits non-zero with no
         usable output, or emits XML that cannot be parsed.
     """
-    cmd = build_command(target, args)
+    cmd = build_command(targets, args)
     if progress_cb is not None:
-        progress_cb(f"Running nmap against {target}…")
+        label = targets[0] if len(targets) == 1 else f"{len(targets)} targets"
+        progress_cb(f"Running nmap against {label}…")
     logger.debug("Executing: %s", " ".join(cmd))
 
     try:

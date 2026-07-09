@@ -10,6 +10,7 @@ from portscanner.reporter import print_full_report, save_report, to_dict
 
 def test_to_dict_structure(sample_report):
     data = to_dict(sample_report)
+    assert data["targets"] == ["scanme.nmap.org"]
     assert data["target"] == "scanme.nmap.org"
     assert data["timed_out"] is False
     assert len(data["hosts"]) == 1
@@ -40,7 +41,7 @@ def test_print_full_report_no_hosts():
     from portscanner.models import ScanReport
 
     con = Console(record=True, width=120)
-    print_full_report(ScanReport(target="nohosts.example"), console=con)
+    print_full_report(ScanReport(targets=["nohosts.example"]), console=con)
     text = con.export_text()
     assert "No hosts reported" in text
 

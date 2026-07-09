@@ -28,7 +28,7 @@ pytest --tb=short -q                        # quick run
 portscanner/
   cli.py          → Typer entry point; target validation, flags, progress, output
   assessor.py     → Public API: assess(...) → ScanReport; nmap2json dict → model conversion
-  nmap_utils.py   → SOLE I/O boundary: build_nmap_args(), build_command(), run_scan(), parse_nmap_xml()
+  nmap_utils.py   → SOLE I/O boundary: build_nmap_args(), build_command(), run_scan(), parse_nmap_xml(), read_targets_file()
   models.py       → HostState/PortState enums; ServiceInfo/PortResult/HostResult/ScanReport dataclasses
   constants.py    → REQUIRED_TOOLS registry; detect_tools(); get_install_hint(); defaults
   reporter.py     → Rich renderers; to_dict(); save_report()
@@ -73,6 +73,9 @@ Never mock `assess()` itself in library tests. `cli.py` tests may patch
 - Timing defaults to `-T4`. `--host-timeout`, `--max-retries`, and `--skip-ping`
   (`-Pn`) map straight through to nmap.
 - `--ports` and `--top-ports` are mutually exclusive; neither → nmap's top-1000.
+- Multiple targets (CLI args and/or `--target-file` / `-iL`) are merged,
+  validated against `constants.TARGET_RE`, de-duplicated by `_collect_targets()`
+  in `assessor.py`, and handed to a **single** nmap invocation.
 
 ## Scoring
 **Inventory only — no letter grade, no severity.** Per the platform convention,
@@ -85,7 +88,7 @@ services identified). Do not add grading.
 - Use `mocker` (pytest-mock) or `unittest.mock.patch`.
 - AAA pattern: Arrange → Act → Assert.
 - Coverage target: ≥ 80% (configured in `pyproject.toml`). Current: **96%**.
-- Current test count: **60 tests**.
+- Current test count: **74 tests**.
 
 ## Adding a scan option
 1. Add the parameter to `nmap_utils.build_nmap_args()` (pure; emit flags in a

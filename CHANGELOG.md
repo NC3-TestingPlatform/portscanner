@@ -11,6 +11,23 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [0.2.0] — 2026-07-09
+
+### Added
+- Multiple targets per scan: `portscanner check host1 host2 10.0.0.0/24`
+  accepts any number of targets, all handed to a single nmap invocation.
+- `--target-file` / `-iL`: read targets from a file (one or more per line;
+  blank lines and `#` comments ignored). File targets are merged with any
+  given on the command line and de-duplicated.
+- `assess()` now accepts a single target string **or** an iterable of targets
+  as its first argument, plus a keyword-only `target_file` parameter.
+
+### Changed
+- `ScanReport.target` (single string) is now a read-only property; the scanned
+  targets are stored in the new `ScanReport.targets` list. JSON output gains a
+  `targets` array while keeping the `target` string for backward compatibility.
+- Passing a single target string to `assess()` still works unchanged.
+
 ## [0.1.0] — 2026-07-09
 
 ### Added
@@ -32,5 +49,6 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Test suite (60 tests) with I/O mocked at the `run_scan` / `subprocess.run`
   boundary.
 
-[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/NC3-TestingPlatform/portscanner/releases/tag/v0.1.0

@@ -17,7 +17,7 @@ Usage example::
 from __future__ import annotations
 
 import json
-import re
+from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
@@ -32,6 +32,7 @@ from portscanner.constants import (
     DEFAULT_TIMEOUT,
     DEFAULT_TIMING,
     REQUIRED_TOOLS,
+    TARGET_RE,
     detect_tools,
     get_install_hint,
 )
@@ -45,16 +46,10 @@ app = typer.Typer(
 
 _err = Console(stderr=True)
 
-# Lenient target matcher: hostnames, IPv4/IPv6 literals, and CIDR ranges all
-# use only these characters. The target is passed to nmap as a subprocess
-# argument (never through a shell), so this guards against obviously malformed
-# input rather than shell injection.
-_TARGET_RE = re.compile(r"^[A-Za-z0-9._:\-/]+$")
-
 
 def _validate_target(value: str) -> str:
     value = value.strip()
-    if not value or not _TARGET_RE.match(value):
+    if not value or not TARGET_RE.match(value):
         raise typer.BadParameter(f"Invalid target: {value!r}")
     return value
 
@@ -88,10 +83,20 @@ def _main(
 
 @app.command()
 def check(
-    target: Annotated[
-        str,
-        typer.Argument(help="Target host, IP, or CIDR range (e.g. scanme.nmap.org, 10.0.0.0/24)."),
-    ],
+    targets: Annotated[
+        Optional[list[str]],
+        typer.Argument(
+            help="One or more targets — host, IP, or CIDR range (e.g. scanme.nmap.org 10.0.0.0/24). Optional when --target-file is given.",
+        ),
+    ] = None,
+    target_file: Annotated[
+        Optional[str],
+        typer.Option(
+            "--target-file",
+            "-iL",
+            help="Read targets from a file (one or more per line; blank lines and '#' comments ignored). Merged with any targets given on the command line.",
+        ),
+    ] = None,
     ports: Annotated[
         Optional[str],
         typer.Option(
@@ -144,22 +149,33 @@ def check(
         typer.Option("--timeout", help="Overall subprocess timeout for the nmap run, in seconds."),
     ] = DEFAULT_TIMEOUT,
 ) -> None:
-    """Run an nmap scan for TARGET and display the port/service inventory."""
-    target = _validate_target(target)
+    """Run an nmap scan for TARGETS and display the port/service inventory."""
+    targets = [_validate_target(t) for t in (targets or [])]
+
+    if target_file and not Path(target_file).is_file():
+        _err.print(f"[red]Error:[/red] target file not found: {target_file}")
+        raise typer.Exit(code=1)
+
+    if not targets and not target_file:
+        _err.print("[red]Error:[/red] provide at least one target or --target-file.")
+        raise typer.Exit(code=1)
 
     if ports and top_ports is not None:
         _err.print("[red]Error:[/red] --ports and --top-ports are mutually exclusive.")
         raise typer.Exit(code=1)
 
+    scan_label = targets[0] if len(targets) == 1 and not target_file else "targets"
+
     with Progress(SpinnerColumn(), TextColumn("{task.description}"), console=_err) as progress:
-        task = progress.add_task(f"Scanning {target}…", total=None)
+        task = progress.add_task(f"Scanning {scan_label}…", total=None)
 
         def _progress_cb(msg: str) -> None:
             progress.update(task, description=msg)
 
         try:
             report = assess(
-                target,
+                targets,
+                target_file=target_file,
                 ports=ports,
                 top_ports=top_ports,
                 timing=timing,

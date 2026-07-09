@@ -12,6 +12,7 @@ from portscanner.nmap_utils import (
     build_command,
     build_nmap_args,
     parse_nmap_xml,
+    read_targets_file,
     run_scan,
 )
 
@@ -60,7 +61,19 @@ def test_build_args_rejects_ports_and_top_ports():
 
 
 def test_build_command_shape():
-    assert build_command("host", ["-sT"]) == ["nmap", "-sT", "-oX", "-", "host"]
+    assert build_command(["host"], ["-sT"]) == ["nmap", "-sT", "-oX", "-", "host"]
+
+
+def test_build_command_multiple_targets():
+    assert build_command(["a", "b", "10.0.0.0/24"], ["-sT"]) == [
+        "nmap",
+        "-sT",
+        "-oX",
+        "-",
+        "a",
+        "b",
+        "10.0.0.0/24",
+    ]
 
 
 # --- parse_nmap_xml ---------------------------------------------------------
@@ -76,6 +89,32 @@ def test_parse_sample(sample_xml):
     assert hosts[0]["addr"] == "45.33.32.156"
     assert hosts[0]["status"]["state"] == "up"
     assert len(hosts[0]["ports"]) == 2
+
+
+# --- read_targets_file ------------------------------------------------------
+
+
+def test_read_targets_file_parses_lines_and_comments(tmp_path):
+    f = tmp_path / "targets.txt"
+    f.write_text(
+        "# a comment\n"
+        "scanme.nmap.org\n"
+        "\n"
+        "10.0.0.1 10.0.0.2\n"
+        "  # indented comment\n"
+        "example.com\n"
+    )
+    assert read_targets_file(str(f)) == [
+        "scanme.nmap.org",
+        "10.0.0.1",
+        "10.0.0.2",
+        "example.com",
+    ]
+
+
+def test_read_targets_file_missing_raises_value_error(tmp_path):
+    with pytest.raises(ValueError, match="not found"):
+        read_targets_file(str(tmp_path / "nope.txt"))
 
 
 # --- run_scan ---------------------------------------------------------------
@@ -99,14 +138,14 @@ def test_run_scan_invokes_progress_cb(mocker, sample_xml):
         return_value=SimpleNamespace(returncode=0, stdout=sample_xml, stderr=""),
     )
     seen = []
-    run_scan("host", args=["-sT"], timeout=10, progress_cb=seen.append)
+    run_scan(["host"], args=["-sT"], timeout=10, progress_cb=seen.append)
     assert seen and "host" in seen[0]
 
 
 def test_run_scan_missing_binary(mocker):
     mocker.patch.object(nmap_utils.subprocess, "run", side_effect=FileNotFoundError)
     with pytest.raises(RuntimeError, match="not found"):
-        run_scan("host", args=["-sT"], timeout=10)
+        run_scan(["host"], args=["-sT"], timeout=10)
 
 
 def test_run_scan_nonzero_with_no_output(mocker):
@@ -116,7 +155,7 @@ def test_run_scan_nonzero_with_no_output(mocker):
         return_value=SimpleNamespace(returncode=1, stdout="", stderr="boom"),
     )
     with pytest.raises(RuntimeError, match="boom"):
-        run_scan("host", args=["-sT"], timeout=10)
+        run_scan(["host"], args=["-sT"], timeout=10)
 
 
 def test_run_scan_malformed_xml(mocker):
@@ -126,7 +165,7 @@ def test_run_scan_malformed_xml(mocker):
         return_value=SimpleNamespace(returncode=0, stdout="<not-valid", stderr=""),
     )
     with pytest.raises(RuntimeError, match="parse"):
-        run_scan("host", args=["-sT"], timeout=10)
+        run_scan(["host"], args=["-sT"], timeout=10)
 
 
 def test_run_scan_timeout_returns_partial_flag(mocker):

@@ -36,6 +36,35 @@ def test_check_json_output(mocker, sample_report):
     assert '"target": "scanme.nmap.org"' in result.output
 
 
+def test_check_multiple_targets(mocker, sample_report):
+    spy = mocker.patch.object(cli, "assess", return_value=sample_report)
+    result = runner.invoke(app, ["check", "a.example", "b.example"])
+    assert result.exit_code == 0
+    passed, kwargs = spy.call_args
+    assert passed[0] == ["a.example", "b.example"]
+    assert kwargs["target_file"] is None
+
+
+def test_check_target_file(mocker, sample_report, tmp_path):
+    f = tmp_path / "targets.txt"
+    f.write_text("a.example\nb.example\n")
+    spy = mocker.patch.object(cli, "assess", return_value=sample_report)
+    result = runner.invoke(app, ["check", "--target-file", str(f)])
+    assert result.exit_code == 0
+    _, kwargs = spy.call_args
+    assert kwargs["target_file"] == str(f)
+
+
+def test_check_no_targets_and_no_file_exit_1():
+    result = runner.invoke(app, ["check"])
+    assert result.exit_code == 1
+
+
+def test_check_missing_target_file_exit_1():
+    result = runner.invoke(app, ["check", "-iL", "/no/such/targets.txt"])
+    assert result.exit_code == 1
+
+
 def test_check_writes_output_file(mocker, sample_report, tmp_path):
     mocker.patch.object(cli, "assess", return_value=sample_report)
     out = tmp_path / "r.txt"

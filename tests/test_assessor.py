@@ -43,6 +43,44 @@ def test_assess_propagates_timed_out(mocker):
     assert report.hosts == []
 
 
+def test_assess_multiple_targets(mocker):
+    spy = mocker.patch.object(assessor, "run_scan", return_value=([], False))
+    report = assess(["a.example", "b.example", "10.0.0.0/24"])
+    assert report.targets == ["a.example", "b.example", "10.0.0.0/24"]
+    passed_targets, _ = spy.call_args
+    assert passed_targets[0] == ["a.example", "b.example", "10.0.0.0/24"]
+    assert "a.example" in report.command and "10.0.0.0/24" in report.command
+
+
+def test_assess_dedupes_targets(mocker):
+    mocker.patch.object(assessor, "run_scan", return_value=([], False))
+    report = assess(["a.example", "a.example", "b.example"])
+    assert report.targets == ["a.example", "b.example"]
+
+
+def test_assess_reads_target_file(mocker, tmp_path):
+    f = tmp_path / "targets.txt"
+    f.write_text("# hosts\nfile-a.example\nfile-b.example\n")
+    mocker.patch.object(assessor, "run_scan", return_value=([], False))
+    report = assess(["cli.example"], target_file=str(f))
+    assert report.targets == ["cli.example", "file-a.example", "file-b.example"]
+
+
+def test_assess_missing_target_file_raises_value_error(tmp_path):
+    with pytest.raises(ValueError, match="not found"):
+        assess(["a.example"], target_file=str(tmp_path / "nope.txt"))
+
+
+def test_assess_invalid_target_raises_value_error():
+    with pytest.raises(ValueError, match="Invalid target"):
+        assess(["bad target"])
+
+
+def test_assess_no_targets_raises_value_error():
+    with pytest.raises(ValueError):
+        assess([])
+
+
 def test_assess_empty_target_raises_value_error():
     with pytest.raises(ValueError):
         assess("   ")

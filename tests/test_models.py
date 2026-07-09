@@ -55,10 +55,16 @@ def test_host_open_ports_filters_by_state():
 
 
 def test_scan_report_defaults():
-    report = ScanReport(target="example.com")
+    report = ScanReport(targets=["example.com"])
     assert report.hosts == []
     assert report.timed_out is False
     assert report.error is None
+
+
+def test_scan_report_target_property_joins():
+    report = ScanReport(targets=["a.example", "10.0.0.0/24"])
+    assert report.target == "a.example 10.0.0.0/24"
+    assert ScanReport().target == ""
 
 
 def test_host_state_enum_values():
