@@ -5,16 +5,15 @@ FROM python:slim
 
 ARG RUSTSCAN_VERSION=2.4.1
 
-# nmap (required) + a build toolchain to compile rustscan from cargo.
+# nmap (required) + cargo/toolchain to build rustscan.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends nmap ca-certificates curl build-essential \
+    && apt-get install -y --no-install-recommends nmap ca-certificates cargo build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # rustscan (optional, for --rustscan): install from crates.io via cargo.
-ENV RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo PATH=/opt/cargo/bin:$PATH
-RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable \
-    && cargo install rustscan --version "${RUSTSCAN_VERSION}" --locked \
-    && rm -rf /opt/cargo/registry /opt/rustup
+ENV CARGO_HOME=/opt/cargo PATH=/opt/cargo/bin:$PATH
+RUN cargo install rustscan --version "${RUSTSCAN_VERSION}" --locked \
+    && rm -rf /opt/cargo/registry
 
 WORKDIR /app
 COPY . /app
