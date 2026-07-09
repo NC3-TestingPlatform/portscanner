@@ -58,7 +58,6 @@ def test_scan_report_defaults():
     report = ScanReport(targets=["example.com"])
     assert report.hosts == []
     assert report.timed_out is False
-    assert report.error is None
 
 
 def test_scan_report_target_property_joins():

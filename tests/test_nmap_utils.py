@@ -168,6 +168,23 @@ def test_run_scan_malformed_xml(mocker):
         run_scan(["host"], args=["-sT"], timeout=10)
 
 
+def test_run_scan_rejects_xxe_entity_payload(mocker):
+    # A DOCTYPE with entity definitions triggers defusedxml's EntitiesForbidden,
+    # which is NOT a ParseError subclass — it must still map to RuntimeError.
+    payload = (
+        '<?xml version="1.0"?>'
+        '<!DOCTYPE nmaprun [<!ENTITY x "boom">]>'
+        "<nmaprun>&x;</nmaprun>"
+    )
+    mocker.patch.object(
+        nmap_utils.subprocess,
+        "run",
+        return_value=SimpleNamespace(returncode=0, stdout=payload, stderr=""),
+    )
+    with pytest.raises(RuntimeError, match="parse"):
+        run_scan(["host"], args=["-sT"], timeout=10)
+
+
 def test_run_scan_timeout_returns_partial_flag(mocker):
     mocker.patch.object(
         nmap_utils.subprocess,

@@ -137,3 +137,9 @@ def test_check_runtime_error_exit_2(mocker):
     mocker.patch.object(cli, "assess", side_effect=RuntimeError("nmap exploded"))
     result = runner.invoke(app, ["check", "host"])
     assert result.exit_code == 2
+
+
+def test_check_keyboard_interrupt_exit_130(mocker):
+    mocker.patch.object(cli, "assess", side_effect=KeyboardInterrupt)
+    result = runner.invoke(app, ["check", "host"])
+    assert result.exit_code == 130

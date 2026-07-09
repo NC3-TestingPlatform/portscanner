@@ -76,6 +76,20 @@ def test_assess_invalid_target_raises_value_error():
         assess(["bad target"])
 
 
+def test_assess_rejects_leading_dash_target():
+    # Argument-injection guard: a target that looks like a flag must be rejected.
+    for bad in ("-oX", "--script", "-iL"):
+        with pytest.raises(ValueError, match="Invalid target"):
+            assess([bad])
+
+
+def test_assess_rejects_leading_dash_from_target_file(mocker, tmp_path):
+    f = tmp_path / "targets.txt"
+    f.write_text("good.example\n-oX\n")
+    with pytest.raises(ValueError, match="Invalid target"):
+        assess([], target_file=str(f))
+
+
 def test_assess_no_targets_raises_value_error():
     with pytest.raises(ValueError):
         assess([])
@@ -109,6 +123,9 @@ def test_assess_rustscan_then_nmap(mocker, sample_hosts):
     _, kwargs = nmap_spy.call_args
     assert "-p" in kwargs["args"]
     assert kwargs["args"][kwargs["args"].index("-p") + 1] == "22,80"
+    # rustscan already established liveness → nmap phase must force -Pn so
+    # ping-blocking hosts are not dropped.
+    assert "-Pn" in kwargs["args"]
     assert "rustscan" in report.command and "nmap" in report.command
     assert len(report.hosts) == 1
 

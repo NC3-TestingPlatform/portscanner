@@ -101,7 +101,7 @@ services identified). Do not add grading.
 - Use `mocker` (pytest-mock) or `unittest.mock.patch`.
 - AAA pattern: Arrange → Act → Assert.
 - Coverage target: ≥ 80% (configured in `pyproject.toml`). Current: **96%**.
-- Current test count: **102 tests**.
+- Current test count: **106 tests**.
 
 ## Adding a scan option
 1. Add the parameter to `nmap_utils.build_nmap_args()` (pure; emit flags in a

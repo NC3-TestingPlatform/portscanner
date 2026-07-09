@@ -48,7 +48,6 @@ def to_dict(report: ScanReport) -> dict:
         "target": report.target,
         "command": report.command,
         "timed_out": report.timed_out,
-        "error": report.error,
         "hosts": [
             {
                 "address": h.address,
@@ -157,8 +156,6 @@ def print_full_report(report: ScanReport, *, console: Console | None = None) -> 
         con.print(f"  [dim]command:[/dim] {report.command}", highlight=False)
     if report.timed_out:
         con.print("  [yellow]warning: scan timed out — results may be partial[/yellow]")
-    if report.error:
-        con.print(f"  [red]error:[/red] {report.error}")
     con.print()
 
     if report.hosts:

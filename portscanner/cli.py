@@ -52,7 +52,7 @@ _err = Console(stderr=True)
 
 def _validate_target(value: str) -> str:
     value = value.strip()
-    if not value or not TARGET_RE.match(value):
+    if not value or value.startswith("-") or not TARGET_RE.match(value):
         raise typer.BadParameter(f"Invalid target: {value!r}")
     return value
 
@@ -220,6 +220,9 @@ def check(
         except ValueError as exc:
             _err.print(f"[red]Error:[/red] {exc}")
             raise typer.Exit(code=1)
+        except KeyboardInterrupt:
+            _err.print("\n[yellow]Interrupted.[/yellow]")
+            raise typer.Exit(code=130)
         except Exception as exc:
             _err.print(f"[red]Connection/scan error:[/red] {exc}")
             raise typer.Exit(code=2)

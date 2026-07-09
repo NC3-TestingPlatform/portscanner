@@ -11,6 +11,26 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [0.4.3] — 2026-07-09
+
+### Fixed
+- `--rustscan`: the nmap phase now forces `-Pn`. rustscan already established
+  liveness by completing a TCP connect to open ports, but nmap re-ran host
+  discovery and marked ping-blocking (firewalled) hosts "down", silently
+  skipping their service scan — exactly the hosts two-phase mode targets.
+- Targets beginning with `-` (e.g. `-oX`, `--script`, `-iL`) are now rejected.
+  They would otherwise be consumed by nmap/rustscan as flags rather than
+  targets (argument injection), notably via `--target-file` content.
+- `defusedxml`'s own guard exceptions (e.g. entity/DTD forbidden) are now mapped
+  to a `RuntimeError` instead of escaping — the defended case for hostile
+  service banners embedded in nmap XML.
+- Ctrl-C during a scan now exits cleanly with code 130 instead of a traceback.
+
+### Removed
+- Dropped two vestigial, never-populated fields: `ServiceInfo.cpe` (always `[]`)
+  and `ScanReport.error` (always `None`; the `error` key is gone from `--json`).
+  CPE metadata will return, actually populated, in a later release.
+
 ## [0.4.2] — 2026-07-09
 
 ### Fixed
@@ -124,7 +144,8 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Test suite (60 tests) with I/O mocked at the `run_scan` / `subprocess.run`
   boundary.
 
-[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.3.0...v0.4.0

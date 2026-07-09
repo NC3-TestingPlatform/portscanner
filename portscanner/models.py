@@ -73,7 +73,6 @@ class ServiceInfo:
     :param version: Detected version string (e.g. ``"9.6p1"``).
     :param extrainfo: Free-form extra info nmap attached (e.g. ``"Ubuntu"``).
     :param method: How the service was determined (``"table"`` or ``"probed"``).
-    :param cpe: List of CPE identifiers nmap emitted for the service.
     """
 
     name: str | None = None
@@ -81,7 +80,6 @@ class ServiceInfo:
     version: str | None = None
     extrainfo: str | None = None
     method: str | None = None
-    cpe: list[str] = field(default_factory=list)
 
     def describe(self) -> str:
         """Return a compact one-line human description of the service.
@@ -155,14 +153,12 @@ class ScanReport:
     :param command: The exact nmap command line that was executed.
     :param hosts: Per-host results parsed from the nmap output.
     :param timed_out: ``True`` when the nmap process was killed on timeout.
-    :param error: Error message if the scan failed; ``None`` on success.
     """
 
     targets: list[str] = field(default_factory=list)
     command: str = ""
     hosts: list[HostResult] = field(default_factory=list)
     timed_out: bool = False
-    error: str | None = None
 
     @property
     def target(self) -> str:

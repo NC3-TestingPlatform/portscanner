@@ -67,7 +67,11 @@ def _collect_targets(
         target = raw.strip()
         if not target:
             continue
-        if not TARGET_RE.match(target):
+        # Reject leading '-': targets are passed to nmap/rustscan as argv, and a
+        # token like "-oX" or "--script" would be consumed as a flag rather than
+        # a target (argument injection — distinct from shell injection). Neither
+        # tool has a universal end-of-options marker, so rejection is the safe path.
+        if target.startswith("-") or not TARGET_RE.match(target):
             raise ValueError(f"Invalid target: {target!r}")
         if target not in seen:
             seen.add(target)
@@ -303,7 +307,11 @@ def assess(
             timing=timing,
             host_timeout=host_timeout,
             max_retries=max_retries,
-            skip_ping=skip_ping,
+            # rustscan already proved these hosts are alive by completing a TCP
+            # connect to open ports, so force -Pn: without it nmap re-runs host
+            # discovery and marks ping-blocking (firewalled) hosts "down",
+            # skipping their service scan even though ports were just found open.
+            skip_ping=True,
             service_detection=service_detection,
         )
         command = f"{rustscan_cmd} && {shlex.join(build_command(target_list, args))}"

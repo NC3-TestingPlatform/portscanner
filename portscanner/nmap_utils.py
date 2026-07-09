@@ -19,6 +19,7 @@ import xml.etree.ElementTree as ET
 from typing import Callable
 
 import defusedxml.ElementTree as DET
+from defusedxml.common import DefusedXmlException
 from nmap2json.nmap2json import nmap_to_json
 
 from portscanner.constants import DEFAULT_TIMING, MAX_TIMING, MIN_TIMING
@@ -193,7 +194,7 @@ def run_scan(
             partial = partial.decode("utf-8", errors="replace")
         try:
             return parse_nmap_xml(partial), True
-        except ET.ParseError:
+        except (ET.ParseError, DefusedXmlException):
             return [], True
 
     if proc.returncode != 0 and not (proc.stdout or "").strip():
@@ -202,5 +203,5 @@ def run_scan(
 
     try:
         return parse_nmap_xml(proc.stdout), False
-    except ET.ParseError as exc:
+    except (ET.ParseError, DefusedXmlException) as exc:
         raise RuntimeError(f"could not parse nmap XML output: {exc}")
