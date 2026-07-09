@@ -3,8 +3,6 @@
 # capabilities (no NET_RAW / root-only raw sockets).
 FROM python:slim
 
-ARG RUSTSCAN_VERSION=2.4.1
-
 # nmap (required) + cargo/toolchain to build rustscan.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends nmap ca-certificates cargo build-essential \
@@ -12,7 +10,7 @@ RUN apt-get update \
 
 # rustscan (optional, for --rustscan): install from crates.io via cargo.
 ENV CARGO_HOME=/opt/cargo PATH=/opt/cargo/bin:$PATH
-RUN cargo install rustscan --version "${RUSTSCAN_VERSION}" --locked \
+RUN cargo install rustscan \
     && rm -rf /opt/cargo/registry
 
 WORKDIR /app

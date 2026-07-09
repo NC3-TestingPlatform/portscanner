@@ -3,8 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        RUSTSCAN_VERSION: "2.4.1"
     image: portscanner:latest
 
     # By default show help. Override with a real scan, e.g.:

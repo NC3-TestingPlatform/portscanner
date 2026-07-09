@@ -14,7 +14,7 @@ $ portscanner check scanme.nmap.org
 ```
 
 ![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)
-![Tests](https://img.shields.io/badge/tests-115%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-118%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPLv3-lightgrey)
 ![CI](https://github.com/NC3-TestingPlatform/portscanner/actions/workflows/ci.yml/badge.svg)
@@ -258,6 +258,6 @@ pytest --tb=short -q      # quick run
 ruff check portscanner/   # lint
 ```
 
-The test suite has **115 tests**. Network and subprocess I/O are mocked at the
+The test suite has **118 tests**. Network and subprocess I/O are mocked at the
 `nmap_utils` / `rustscan_utils` / `subprocess.run` boundaries, so tests never
 launch nmap or rustscan.

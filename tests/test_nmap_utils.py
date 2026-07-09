@@ -65,6 +65,12 @@ def test_build_args_rejects_ports_and_top_ports():
         build_nmap_args(ports="22", top_ports=10)
 
 
+def test_build_args_rejects_ports_and_zero_top_ports():
+    # top_ports=0 must still trip mutual-exclusion (guarded by `is not None`).
+    with pytest.raises(ValueError):
+        build_nmap_args(ports="22", top_ports=0)
+
+
 def test_build_command_shape():
     assert build_command(["host"], ["-sT"]) == ["nmap", "-sT", "-oX", "-", "host"]
 

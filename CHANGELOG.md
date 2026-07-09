@@ -15,6 +15,18 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [0.6.1] — 2026-07-09
+
+### Fixed
+- `--rustscan`: if the nmap phase times out before finishing a host (e.g. a slow
+  `-sC` run on many ports), the ports rustscan already discovered are now
+  reported (state `open`, no service detail) instead of the scan returning zero
+  hosts. rustscan proved those ports open via a completed TCP connect, so they
+  are no longer discarded just because nmap's follow-up was killed.
+- `build_nmap_args`: `top_ports=0` combined with `ports=` now correctly raises
+  (the mutual-exclusion guard used truthiness; a direct library call with
+  `top_ports=0` silently dropped it — the CLI was already guarded).
+
 ## [0.6.0] — 2026-07-09
 
 ### Added
@@ -192,7 +204,8 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Test suite (60 tests) with I/O mocked at the `run_scan` / `subprocess.run`
   boundary.
 
-[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.5.0...v0.5.1

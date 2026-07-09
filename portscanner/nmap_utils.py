@@ -68,7 +68,7 @@ def build_nmap_args(
         raise ValueError(
             f"timing must be between {MIN_TIMING} and {MAX_TIMING}, got {timing}"
         )
-    if ports and top_ports:
+    if ports and top_ports is not None:
         raise ValueError("Specify either ports or top_ports, not both.")
 
     args: list[str] = ["-sT"]

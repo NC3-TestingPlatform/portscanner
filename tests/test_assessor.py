@@ -195,6 +195,36 @@ def test_assess_mixed_family_splits_into_two_nmap_runs(mocker):
     assert by_family[True] == ["2001:db8::1"]  # IPv6 group, -6
 
 
+def test_assess_rustscan_backfills_on_nmap_timeout(mocker):
+    # rustscan found ports but nmap timed out with nothing parseable → the
+    # rustscan-discovered ports must still surface (not an empty report).
+    mocker.patch.object(
+        assessor, "run_scan_rustscan", return_value=({"1.2.3.4": [22, 80]}, "rustscan")
+    )
+    mocker.patch.object(assessor, "run_scan", return_value=([], True))
+    report = assess(["1.2.3.4"], rustscan=True)
+
+    assert report.timed_out is True
+    assert len(report.hosts) == 1
+    host = report.hosts[0]
+    assert host.address == "1.2.3.4"
+    assert host.state == HostState.UP
+    assert [p.port for p in host.ports] == [22, 80]
+    assert all(p.state == PortState.OPEN for p in host.ports)
+
+
+def test_assess_rustscan_no_backfill_when_nmap_returns_host(mocker, sample_hosts):
+    # When nmap returns the host, rustscan's map must not duplicate it.
+    mocker.patch.object(
+        assessor,
+        "run_scan_rustscan",
+        return_value=({"45.33.32.156": [22, 443]}, "rustscan"),
+    )
+    mocker.patch.object(assessor, "run_scan", return_value=(sample_hosts, False))
+    report = assess(["scanme.nmap.org"], rustscan=True)
+    assert len(report.hosts) == 1  # not duplicated
+
+
 def test_assess_rustscan_per_host_targeting(mocker):
     # Two hosts with different open ports → one nmap run per port-set, each
     # scanning only its host for only its ports.

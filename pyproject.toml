@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "portscanner"
-version = "0.6.0"
+version = "0.6.1"
 description = "Port scanning CLI: nmap-driven port/service inventory parsed via nmap2json"
 readme = "README.md"
 requires-python = ">=3.11"

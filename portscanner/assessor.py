@@ -291,6 +291,37 @@ def _rustscan_invocations(
     return invocations
 
 
+def _backfill_rustscan_hosts(
+    hosts: list[HostResult], open_map: dict[str, list[int]]
+) -> list[HostResult]:
+    """Add hosts rustscan found but nmap did not report (e.g. nmap timed out).
+
+    rustscan proved these ports open via a completed TCP connect, so if the nmap
+    phase is killed (slow ``-sV``/``-sC``) before finishing a host, fall back to
+    rustscan's finding rather than dropping the host entirely — the port
+    inventory is still accurate, just without nmap's service/script detail.
+
+    :param hosts: Hosts parsed from nmap output (may be empty on timeout).
+    :param open_map: rustscan's host → open ports map.
+    :returns: *hosts* with any missing rustscan hosts appended.
+    :rtype: list[HostResult]
+    """
+    present = {host.address for host in hosts}
+    for address, ports in open_map.items():
+        if address not in present:
+            hosts.append(
+                HostResult(
+                    address=address,
+                    state=HostState.UP,
+                    ports=[
+                        PortResult(port=p, protocol="tcp", state=PortState.OPEN)
+                        for p in ports
+                    ],
+                )
+            )
+    return hosts
+
+
 def assess(
     targets: str | Iterable[str],
     *,
@@ -361,6 +392,7 @@ def assess(
             progress_cb(msg)
 
     prefix = ""
+    open_map: dict[str, list[int]] = {}
     if rustscan:
         if ports or top_ports is not None:
             raise ValueError(
@@ -426,6 +458,9 @@ def assess(
 
     command = prefix + " ; ".join(commands)
     hosts = _merge_hosts_by_address([_to_host(h) for h in raw_hosts])
+    if rustscan:
+        # Salvage rustscan's findings for any host nmap didn't finish (timeout).
+        hosts = _backfill_rustscan_hosts(hosts, open_map)
     hosts.sort(key=lambda h: h.address)
     _cb(f"Parsed {len(hosts)} host(s).")
 
