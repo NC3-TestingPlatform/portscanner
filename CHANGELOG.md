@@ -12,8 +12,19 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Remaining Tier 2 items: per-host port targeting (scan each host only for its
   own rustscan-discovered ports, instead of the global union), and IPv6 (`-6`) /
   UDP (`-sU`) support.
+- Remaining Tier 3 items: stream nmap output for per-host progress + bounded
+  memory on very large scans; process-group termination of the scanner child.
 
 ---
+
+## [0.5.2] — 2026-07-09
+
+### Fixed
+- A scan that times out now recovers the hosts nmap already finished instead of
+  reporting none. nmap only writes the closing `</nmaprun>` on clean completion,
+  so a killed scan left truncated XML that failed to parse and yielded zero
+  hosts; `run_scan` now repairs the partial XML (keeps everything through the
+  last complete `</host>`) and returns those hosts with `timed_out=True`.
 
 ## [0.5.1] — 2026-07-09
 
@@ -168,7 +179,8 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Test suite (60 tests) with I/O mocked at the `run_scan` / `subprocess.run`
   boundary.
 
-[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.3...v0.5.0
 [0.4.3]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.4.2...v0.4.3

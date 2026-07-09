@@ -208,6 +208,30 @@ def test_run_scan_timeout_returns_partial_flag(mocker):
     assert hosts == []
 
 
+def test_run_scan_timeout_recovers_completed_hosts(mocker):
+    # One complete host, then a second host truncated mid-tag (no </nmaprun>).
+    truncated = (
+        '<?xml version="1.0"?>'
+        '<nmaprun scanner="nmap" version="7.99">'
+        '<host><status state="up"/><address addr="10.0.0.1" addrtype="ipv4"/>'
+        '<ports><port protocol="tcp" portid="22"><state state="open"/></port>'
+        "</ports></host>"
+        '<host><status state="up"/><address addr="10.0.0.2" addrtype="ipv4"/>'
+        '<ports><port protocol="tcp" portid="80"><state stat'
+    )
+    mocker.patch.object(
+        nmap_utils.subprocess,
+        "run",
+        side_effect=subprocess.TimeoutExpired(
+            cmd=["nmap"], timeout=1, output=truncated
+        ),
+    )
+    hosts, timed_out = run_scan(["r"], args=["-sT"], timeout=1)
+    assert timed_out is True
+    # The completed host is recovered; the truncated one is dropped.
+    assert [h["addr"] for h in hosts] == ["10.0.0.1"]
+
+
 def test_run_scan_timeout_parses_partial_xml(mocker, sample_xml):
     mocker.patch.object(
         nmap_utils.subprocess,

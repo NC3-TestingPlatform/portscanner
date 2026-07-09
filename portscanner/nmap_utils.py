@@ -180,6 +180,47 @@ def read_targets_file(path: str) -> list[str]:
     return targets
 
 
+def _repair_partial_xml(text: str) -> str | None:
+    """Best-effort repair of nmap XML truncated by a killed scan.
+
+    nmap streams one ``<host>`` block at a time and only writes the closing
+    ``</nmaprun>`` on clean completion, so a killed scan leaves the document
+    unterminated (often mid-``<host>``). Keep everything up to the last complete
+    ``</host>`` and close the run, so the hosts nmap *did* finish can be parsed.
+
+    :param text: The partial XML captured before the process was killed.
+    :returns: A parseable XML string, or ``None`` if no complete host is present.
+    :rtype: str | None
+    """
+    if not text:
+        return None
+    end = text.rfind("</host>")
+    if end == -1:
+        return None
+    return text[: end + len("</host>")] + "</nmaprun>"
+
+
+def _parse_partial_xml(text: str) -> list[dict]:
+    """Parse possibly-truncated nmap XML, recovering completed hosts.
+
+    Tries the text as-is first (nmap may have flushed a valid footer), then a
+    :func:`_repair_partial_xml` fallback. Returns an empty list only when
+    nothing parseable remains.
+
+    :param text: Partial nmap XML from a timed-out scan.
+    :returns: Host dicts for the hosts that completed before the timeout.
+    :rtype: list[dict]
+    """
+    for candidate in (text, _repair_partial_xml(text)):
+        if not candidate:
+            continue
+        try:
+            return parse_nmap_xml(candidate)
+        except (ET.ParseError, DefusedXmlException):
+            continue
+    return []
+
+
 def build_command(targets: list[str], args: list[str]) -> list[str]:
     """Assemble the full nmap argv for *targets* with pre-built *args*.
 
@@ -234,10 +275,7 @@ def run_scan(
         partial = exc.stdout or ""
         if isinstance(partial, bytes):  # pragma: no cover – text=True yields str
             partial = partial.decode("utf-8", errors="replace")
-        try:
-            return parse_nmap_xml(partial), True
-        except (ET.ParseError, DefusedXmlException):
-            return [], True
+        return _parse_partial_xml(partial), True
 
     if proc.returncode != 0 and not (proc.stdout or "").strip():
         detail = (proc.stderr or "").strip() or f"nmap exited with code {proc.returncode}"
