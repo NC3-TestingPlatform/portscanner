@@ -41,8 +41,11 @@ DEFAULT_TIMING = 4
 MIN_TIMING = 0
 MAX_TIMING = 5
 
-# Overall subprocess timeout for a single scanner invocation, in seconds.
-DEFAULT_TIMEOUT = 300.0
+# Per-process subprocess timeout for a single scanner invocation, in seconds.
+# Generous by default because service/version detection (-sV) and especially
+# NSE scripts (-sC) across many ports can be slow; scans that still exceed it
+# are killed and (in rustscan mode) fall back to the discovered port list.
+DEFAULT_TIMEOUT = 900.0
 
 
 def detect_tools() -> dict[str, bool]:

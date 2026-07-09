@@ -220,7 +220,7 @@ assess(
     rustscan_timeout=None, # rustscan per-port --timeout (ms)
     rustscan_ports=None,   # rustscan discovery range (default: full range)
     rustscan_ulimit=None,  # rustscan --ulimit
-    timeout=300.0,         # per-process subprocess timeout (float)
+    timeout=900.0,         # per-process subprocess timeout (float)
     progress_cb=None,      # Callable[[str], None]
 ) -> ScanReport
 ```

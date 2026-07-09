@@ -15,6 +15,14 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [0.6.2] — 2026-07-09
+
+### Changed
+- Default `--timeout` raised from 300s to **900s** (per scanner process). NSE
+  scripts (`-sC`) and version detection across many ports routinely exceeded
+  300s and got killed; 900s lets those scans complete while staying bounded
+  (and the rustscan port-list fallback still covers a genuine overrun).
+
 ## [0.6.1] — 2026-07-09
 
 ### Fixed
@@ -204,7 +212,8 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Test suite (60 tests) with I/O mocked at the `run_scan` / `subprocess.run`
   boundary.
 
-[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.5.1...v0.5.2
