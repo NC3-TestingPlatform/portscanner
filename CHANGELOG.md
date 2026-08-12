@@ -15,6 +15,15 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [0.6.3] — 2026-08-12
+
+### Changed
+- `pyproject.toml`: `license` is now the canonical SPDX expression
+  `GPL-3.0-only` instead of the deprecated `GPL-3.0` identifier. The license
+  itself is unchanged — only its machine-readable spelling.
+
+---
+
 ## [0.6.2] — 2026-07-09
 
 ### Changed
@@ -212,7 +221,8 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Test suite (60 tests) with I/O mocked at the `run_scan` / `subprocess.run`
   boundary.
 
-[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/NC3-TestingPlatform/portscanner/compare/v0.5.2...v0.6.0
