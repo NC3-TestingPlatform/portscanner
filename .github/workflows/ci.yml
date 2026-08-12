@@ -52,4 +52,10 @@ jobs:
       - name: Test
         # Network I/O is isolated in the *_utils modules and mocked there, so
         # the suite needs neither a live network nor any external binary.
-        run: pytest --tb=short -q
+        #
+        # --cov-fail-under lives here rather than in pyproject addopts: in
+        # addopts it also applies to targeted runs such as
+        # `pytest tests/test_x.py::TestY -v`, which measure the whole package
+        # while executing one class and so fail the gate at ~3% coverage even
+        # when every selected test passes.
+        run: pytest --tb=short -q --cov-fail-under=80
