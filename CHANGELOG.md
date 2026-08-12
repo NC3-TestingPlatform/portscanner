@@ -18,9 +18,22 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 ## [0.6.3] — 2026-08-12
 
 ### Changed
+- Dependency floors raised across the board by the Dependabot batch of
+  2026-08-12 (PRs #2-#9), bringing every declared minimum up to the versions
+  the suite is actually exercised against: `defusedxml>=0.7.1`, `rich>=15.0.0`,
+  `typer>=0.27.1`, the build requirement `setuptools>=84.0.0`, and the dev
+  extras `pytest>=9.1.1`, `pytest-cov>=7.1.0`, `pytest-mock>=3.15.1`,
+  `ruff>=0.16.2`. Five cross a major-version boundary (`rich`, `setuptools`,
+  `pytest`, `pytest-cov`, `ruff`); `typer` 0.12 → 0.27 stays within `0.x`.
+  No source change was required.
+  An environment installed before this batch may sit below the declared floor —
+  re-run `pip install -e ".[dev]"`.
 - `pyproject.toml`: `license` is now the canonical SPDX expression
   `GPL-3.0-only` instead of the deprecated `GPL-3.0` identifier. The license
-  itself is unchanged — only its machine-readable spelling.
+  itself is unchanged — only its machine-readable spelling. The `setuptools`
+  floor above also settles PEP 639 support (a string `license` holding an SPDX
+  expression, plus `license-files`), which requires setuptools ≥ 77; the
+  previous `>=68` allowed versions that reject a string `license` value.
 
 ---
 
