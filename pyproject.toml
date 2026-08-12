@@ -39,7 +39,7 @@ classifiers = [
 dependencies = [
     "defusedxml>=0.7",
     "nmap2json>=2605.0",
-    "rich>=13.7",
+    "rich>=15.0.0",
     "typer>=0.12",
 ]
 
